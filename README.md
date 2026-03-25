@@ -1,4 +1,76 @@
-NutriLife 🍎O NutriLife é uma plataforma web desenvolvida para otimizar a conexão entre nutricionistas e pacientes. O sistema foca em agilizar o agendamento de consultas, facilitar o acesso a planos alimentares personalizados e garantir uma gestão financeira segura e automatizada.🚀 Sobre o ProjetoO projeto surge como uma solução para modernizar o atendimento nutricional, substituindo processos manuais ou tecnologias obsoletas por uma interface intuitiva, suporte em tempo real e integração de pagamentos.Principais Funcionalidades📅 Agendamento Online: Marcação de consultas com visualização de horários disponíveis em tempo real.💳 Pagamento Integrado: Contratação de planos nutricionais (estilo assinatura) via plataforma segura.🥗 Plano Alimentar Digital: Acesso prático às dietas e orientações nutricionais pelo paciente.💬 Suporte Integrado: Canal de comunicação direto (via integração com WhatsApp) para dúvidas e ajustes.📋 Gestão de Pacientes: Painel administrativo para a nutricionista gerenciar prontuários e evoluções.🛠️ Tecnologias UtilizadasO NutriLife utiliza uma stack moderna e escalável:CamadaTecnologiaFrontendJavaScript (React/Vue), HTML5, CSS3BackendPython (Django/Flask)Banco de DadosMongoDB (NoSQL)HospedagemNetlifyPagamentosIntegração via API (estilo PagSeguro)🏗️ Arquitetura do SistemaO sistema foi desenhado para ser acessível via navegador, eliminando a necessidade de instalações locais e garantindo que o suporte esteja sempre visível ao cliente.👥 Equipe (Stakeholders)Gabriel dos Santos Novaes - DesenvolvedorGabriella Vitor Siqueira - DesenvolvedoraEnzo Magalhães Lima - DesenvolvedorGuilherme Moreira Flauzino Pimentel - Desenvolvedor📄 DocumentaçãoPara mais detalhes sobre o planejamento e regras de negócio, consulte os documentos abaixo:Documento de VisãoRequisitos Não-FuncionaisDicionário de Dados🔧 Instalação e Execução (Breve)Nota: O projeto está em fase inicial de desenvolvimento.Clone o repositório:Bashgit clone https://github.com/Yukitte/NutriLife.git
-Instale as dependências do Backend:Bashpip install -r requirements.txt
-Instale as dependências do Frontend:Bashnpm install
-NutriLife - Transformando a saúde através da tecnologia.
+# NutriLife 🍎
+
+O **NutriLife** é uma plataforma web moderna projetada para nutricionistas e pacientes, focada em automatizar o agendamento de consultas, a gestão de planos alimentares e o processamento de pagamentos.
+
+---
+
+## 🚀 Sobre o Projeto
+
+O NutriLife resolve o problema de tecnologias obsoletas e dificuldades de suporte em tempo real. A plataforma centraliza o acompanhamento nutricional, permitindo que o paciente tenha sua dieta na palma da mão e a nutricionista gerencie sua agenda com eficiência.
+
+### Principais Funcionalidades
+* **📅 Agendamento Inteligente:** Consulta de horários em tempo real e marcação online.
+* **💳 Pagamentos Integrados:** Sistema de checkout para planos nutricionais (estilo streaming/assinatura).
+* **🥗 Plano Alimentar Digital:** Acesso prático às dietas personalizadas via navegador.
+* **💬 Suporte em Tempo Real:** Integração para dúvidas e ajustes rápidos entre nutricionista e cliente.
+* **👥 Gestão de Usuários:** Cadastro completo de pacientes com histórico de consultas.
+
+---
+
+## 🛠️ Stack Tecnológica
+
+| Camada | Tecnologia |
+| :--- | :--- |
+| **Frontend** | JavaScript, HTML5, CSS3 |
+| **Backend** | Python |
+| **Banco de Dados** | MongoDB (NoSQL) |
+| **Hospedagem** | Netlify |
+| **Pagamentos** | Integração via APIs (ex: PagSeguro) |
+
+---
+
+## 👥 Equipe de Desenvolvimento
+
+* **Gabriel dos Santos Novaes**
+* **Gabriella Vitor Siqueira**
+* **Enzo Magalhães Lima**
+* **Guilherme Moreira Flauzino Pimentel**
+
+---
+
+## 📋 Requisitos do Sistema (MVP)
+
+### Críticos (Alta Prioridade)
+1.  **Cadastro e Login:** Controle de acesso seguro para profissionais e pacientes.
+2.  **Agendamento Online:** Funcionalidade principal para evitar conflitos de agenda.
+3.  **Checkout Seguro:** Integração de pagamento para validação das consultas.
+
+### Importantes
+1.  **Dietas Personalizadas:** Visualização individualizada de planos alimentares.
+2.  **Gestão de Planos:** Oferta de planos trimestrais e semestrais.
+3.  **Painel da Nutricionista:** Interface para confirmar, remarcar ou cancelar atendimentos.
+
+---
+
+## 🔧 Estrutura de Pastas (Sugestão)
+
+```
+├── src/
+│   ├── backend/      # Scripts em Python e conexões MongoDB
+│   ├── frontend/     # Lógica em JS e estilização
+│   └── assets/       # Imagens e ícones
+├── docs/             # Documentação de Visão e Requisitos
+└── README.md
+
+````
+## 📦 Como contribuir (Instalação local)
+Nota: O projeto está na versão 1.0 (Março/2026).
+
+1. Clone o repositório:
+
+git clone [https://github.com/Yukitte/NutriLife.git](https://github.com/Yukitte/NutriLife.git)
+
+2. Configure o ambiente Python:
+
+python -m venv venv
+source venv/bin/activate
