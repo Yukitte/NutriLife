@@ -52,7 +52,7 @@ O NutriLife resolve o problema de tecnologias obsoletas e dificuldades de suport
 
 ---
 
-## 🔧 Estrutura de Pastas (Sugestão)
+## 🔧 Estrutura de Pastas 
 
 ```
 ├── src/
