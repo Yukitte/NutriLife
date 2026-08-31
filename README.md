@@ -33,7 +33,6 @@ O NutriLife resolve o problema de tecnologias obsoletas e dificuldades de suport
 
 * **Gabriel dos Santos Novaes**
 * **Gabriella Vitor Siqueira**
-* **Enzo Magalhães Lima**
 * **Guilherme Moreira Flauzino Pimentel**
 
 ---
