@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>NutriLife | Cuidado nutricional de forma simples</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="./css/global.css">
+    <link rel="stylesheet" href="./css/home.css">
+</head>
+
+<body>
+
+    <div data-component="header"></div>
+
+    <main>
+        <section class="hero">
+            <div class="hero-copy">
+                <span class="eyebrow">Nutrição que acompanha você</span>
+                <h1>
+                    Cuidar da sua alimentação
+                    pode ser mais simples.
+                </h1>
+
+                <p>
+                    O NutriLife conecta pacientes e nutricionistas
+                    em um único lugar, tornando o acompanhamento
+                    nutricional mais organizado, próximo e acessível.
+                </p>
+                <a href="./pages/auth/login.html" class="btn btn--primary">
+                    Começar agora
+                </a>
+            </div>
+
+            <div class="hero-art" aria-hidden="true">
+                <svg class="plate" viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="160" cy="160" r="150" class="plate-ring" />
+                    <path d="M160 160 L160 22 A138 138 0 0 1 279 229 Z" class="plate-slice plate-slice--a" />
+                    <path d="M160 160 L279 229 A138 138 0 0 1 41 229 Z" class="plate-slice plate-slice--b" />
+                    <path d="M160 160 L41 229 A138 138 0 0 1 160 22 Z" class="plate-slice plate-slice--c" />
+                    <circle cx="160" cy="160" r="46" class="plate-core" />
+                </svg>
+
+                <article class="float-card float-card--meal">
+                    <span class="float-card__time">07:00 · Café da manhã</span>
+                    <strong>Cuscuz + Café</strong>
+                    <span class="float-card__meta">≈ 320 kcal</span>
+                </article>
+
+                <article class="float-card float-card--session">
+                    <span class="float-card__time">Consulta · 20/03</span>
+                    <strong>Dra. Ana Ferreira</strong>
+                    <span class="float-card__meta">Acompanhamento mensal</span>
+                </article>
+            </div>
+        </section>
+
+        <section id="sobre" class="section section--pale about">
+            <span class="eyebrow">Sobre o NutriLife</span>
+            <h2>
+                Mais do que uma plataforma.
+                Um espaço para cuidar.
+            </h2>
+            <p>
+                O NutriLife foi pensado para aproximar o paciente
+                do seu acompanhamento nutricional e oferecer ao
+                nutricionista uma forma mais organizada de cuidar
+                de seus pacientes.
+            </p>
+        </section>
+
+        <!-- Para pacientes -->
+        <section id="pacientes" class="section audience">
+            <div class="audience-head">
+                <span class="eyebrow">Para você, paciente</span>
+                <h2>
+                    Seu cuidado nutricional
+                    em um só lugar.
+                </h2>
+                <p>
+                    Tenha acesso às principais informações do seu
+                    acompanhamento de forma simples e organizada.
+                </p>
+            </div>
+
+            <div class="card-grid">
+                <article class="feature-card">
+                    <span class="feature-card__icon" data-icon="plan"></span>
+                    <h3>Plano alimentar</h3>
+                    <p>
+                        Consulte seu plano alimentar e acompanhe
+                        suas refeições de forma prática.
+                    </p>
+                </article>
+
+                <article class="feature-card">
+                    <span class="feature-card__icon" data-icon="track"></span>
+                    <h3>Acompanhamento</h3>
+                    <p>
+                        Acompanhe suas informações e objetivos
+                        ao longo do seu processo.
+                    </p>
+                </article>
+
+                <article class="feature-card">
+                    <span class="feature-card__icon" data-icon="calendar"></span>
+                    <h3>Consultas</h3>
+                    <p>
+                        Consulte seus próximos atendimentos e
+                        organize sua rotina.
+                    </p>
+                </article>
+
+                <article class="feature-card">
+                    <span class="feature-card__icon" data-icon="chat"></span>
+                    <h3>Comunicação</h3>
+                    <p>
+                        Mantenha contato com seu nutricionista
+                        através da plataforma.
+                    </p>
+                </article>
+            </div>
+        </section>
+
+        <!-- Para nutricionistas -->
+        <section id="nutricionistas" class="section section--dark audience audience--pro">
+            <div class="audience-head">
+                <span class="eyebrow">Para nutricionistas</span>
+                <h2>
+                    Mais organização para cuidar
+                    de quem confia em você.
+                </h2>
+                <p>
+                    Tenha uma visão centralizada dos seus pacientes,
+                    planos alimentares, consultas e comunicação.
+                </p>
+            </div>
+
+            <div class="card-grid">
+                <article class="feature-card feature-card--dark">
+                    <span class="feature-card__icon" data-icon="patients"></span>
+                    <h3>Gestão de pacientes</h3>
+
+                    <p>
+                        Organize e consulte as informações dos
+                        seus pacientes em um único ambiente.
+                    </p>
+                </article>
+
+                <article class="feature-card feature-card--dark">
+                    <span class="feature-card__icon" data-icon="plan"></span>
+                    <h3>Planos alimentares</h3>
+
+                    <p>
+                        Crie e gerencie os planos alimentares
+                        de seus pacientes.
+                    </p>
+                </article>
+
+                <article class="feature-card feature-card--dark">
+                    <span class="feature-card__icon" data-icon="calendar"></span>
+                    <h3>Agenda</h3>
+                    <p>
+                        Organize seus horários e acompanhe
+                        suas consultas.
+                    </p>
+                </article>
+
+                <article class="feature-card feature-card--dark">
+                    <span class="feature-card__icon" data-icon="chat"></span>
+                    <h3>Comunicação</h3>
+                    <p>
+                        Mantenha uma comunicação mais próxima
+                        com seus pacientes.
+                    </p>
+                </article>
+            </div>
+        </section>
+
+
+        <section id="como-funciona" class="section how">
+            <span class="eyebrow">Como funciona</span>
+            <h2>
+                Um acompanhamento mais simples.
+            </h2>
+
+            <div class="how-steps">
+                <article class="how-step">
+                    <span class="how-step__number">01</span>
+                    <h3>Entre na plataforma</h3>
+                    <p>
+                        Acesse sua conta de forma rápida e segura.
+                    </p>
+                </article>
+
+                <article class="how-step">
+                    <span class="how-step__number">02</span>
+
+                    <h3>Tenha tudo organizado</h3>
+
+                    <p>
+                        Consulte suas informações, planos,
+                        consultas e comunicação.
+                    </p>
+                </article>
+
+                <article class="how-step">
+                    <span class="how-step__number">03</span>
+                    <h3>Continue evoluindo</h3>
+                    <p>
+                        Acompanhe seu processo com mais
+                        praticidade e organização.
+                    </p>
+                </article>
+            </div>
+        </section>
+
+
+        <section class="section manifesto">
+            <h2>
+                Pequenas escolhas.
+                Grandes mudanças.
+            </h2>
+            <p>
+                O cuidado com a alimentação faz parte de uma
+                jornada. O NutriLife está aqui para tornar
+                essa jornada mais organizada.
+            </p>
+        </section>
+
+        <section class="section section--pale final-cta">
+            <h2>
+                Pronto para começar?
+            </h2>
+            <p>
+                Entre no NutriLife e tenha seu acompanhamento
+                nutricional em um só lugar.
+            </p>
+            <a href="./pages/auth/login.html" class="btn btn--primary">
+                Entrar no NutriLife
+            </a>
+        </section>
+
+    </main>
+    <div data-component="footer"></div>
+    <script src="/js/components.js" defer></script>
+</body>
+
+</html>
