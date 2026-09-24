@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Cadastro | NutriLife</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/css/global.css">
+    <link rel="stylesheet" href="/css/auth/auth.css">
+</head>
+
+<body class="auth-page">
+
+    <div data-component="auth-brand"></div>
+
+    <main class="auth-main">
+        <section class="auth-card auth-card--wide">
+            <span class="eyebrow">Crie sua conta</span>
+            <h1>Cadastro</h1>
+            <p class="auth-card__subtitle">
+                Preencha seus dados para começar a usar o NutriLife.
+            </p>
+
+            <form id="cadastro-form" class="auth-form auth-form--grid">
+                <div class="field field--full">
+                    <label for="nome">Nome</label>
+                    <input type="text" id="nome" name="nome" placeholder="Seu nome completo" autocomplete="name" required>
+                </div>
+
+                <div class="field">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" placeholder="voce@email.com" autocomplete="email" required>
+                </div>
+
+                <div class="field">
+                    <label for="telefone">Telefone</label>
+                    <input type="tel" id="telefone" name="telefone" placeholder="(00) 00000-0000" autocomplete="tel" inputmode="numeric" pattern="\(\d{2}\) \d{4,5}-\d{4}" required>
+                </div>
+
+                <div class="field">
+                    <label for="cep">CEP</label>
+                    <input type="text" id="cep" name="cep" placeholder="00000-000" autocomplete="postal-code" inputmode="numeric" pattern="\d{5}-\d{3}" aria-describedby="cep-hint" required>
+                    <small class="field-hint" id="cep-hint">Digite o CEP para preencher o endereço.</small>
+                </div>
+
+                <div class="field">
+                    <label for="estado">Estado</label>
+                    <select id="estado" name="estado" required>
+                        <option value="" disabled selected>Selecione</option>
+                        <option value="AC">Acre</option>
+                        <option value="AL">Alagoas</option>
+                        <option value="AP">Amapá</option>
+                        <option value="AM">Amazonas</option>
+                        <option value="BA">Bahia</option>
+                        <option value="CE">Ceará</option>
+                        <option value="DF">Distrito Federal</option>
+                        <option value="ES">Espírito Santo</option>
+                        <option value="GO">Goiás</option>
+                        <option value="MA">Maranhão</option>
+                        <option value="MT">Mato Grosso</option>
+                        <option value="MS">Mato Grosso do Sul</option>
+                        <option value="MG">Minas Gerais</option>
+                        <option value="PA">Pará</option>
+                        <option value="PB">Paraíba</option>
+                        <option value="PR">Paraná</option>
+                        <option value="PE">Pernambuco</option>
+                        <option value="PI">Piauí</option>
+                        <option value="RJ">Rio de Janeiro</option>
+                        <option value="RN">Rio Grande do Norte</option>
+                        <option value="RS">Rio Grande do Sul</option>
+                        <option value="RO">Rondônia</option>
+                        <option value="RR">Roraima</option>
+                        <option value="SC">Santa Catarina</option>
+                        <option value="SP">São Paulo</option>
+                        <option value="SE">Sergipe</option>
+                        <option value="TO">Tocantins</option>
+                    </select>
+                </div>
+
+                <div class="field field--full">
+                    <label for="rua">Rua</label>
+                    <input type="text" id="rua" name="rua" placeholder="Nome da rua ou avenida" autocomplete="address-line1" required>
+                </div>
+
+                <div class="field">
+                    <label for="numero">Número</label>
+                    <input type="text" id="numero" name="numero" placeholder="Ex.: 120" required>
+                </div>
+
+                <div class="field">
+                    <label for="complemento">Complemento <span class="field-optional">(opcional)</span></label>
+                    <input type="text" id="complemento" name="complemento" placeholder="Apto, bloco, sala..." autocomplete="address-line2">
+                </div>
+
+                <div class="field">
+                    <label for="bairro">Bairro</label>
+                    <input type="text" id="bairro" name="bairro" placeholder="Seu bairro" required>
+                </div>
+
+                <div class="field">
+                    <label for="cidade">Cidade</label>
+                    <input type="text" id="cidade" name="cidade" placeholder="Sua cidade" autocomplete="address-level2" required>
+                </div>
+
+                <div class="field">
+                    <label for="senha">Senha</label>
+                    <input type="password" id="senha" name="senha" placeholder="Mínimo de 6 caracteres" autocomplete="new-password" minlength="6" required>
+                </div>
+
+                <div class="field">
+                    <label for="confirmar-senha">Confirmar senha</label>
+                    <input type="password" id="confirmar-senha" name="confirmarSenha" placeholder="Repita a senha" autocomplete="new-password" required>
+                </div>
+
+                <div class="field field--full">
+                    <label for="tipo">Tipo de usuário</label>
+                    <select id="tipo" name="tipo" required>
+                        <option value="" disabled selected>Selecione</option>
+                        <option value="paciente">Paciente</option>
+                        <option value="nutricionista">Nutricionista</option>
+                    </select>
+                </div>
+
+                <div class="field" id="crn-field" hidden>
+                    <label for="crn">CRN do nutricionista</label>
+                    <input type="text" id="crn" name="crn" placeholder="Ex.: CRN-1 12345">
+                </div>
+
+                <div class="field" id="especialidade-field" hidden>
+                    <label for="especialidade">Especialidade principal</label>
+                    <select id="especialidade" name="especialidade">
+                        <option value="" disabled selected>Selecione</option>
+                    </select>
+                </div>
+
+                <p class="auth-feedback field--full" role="status" aria-live="polite"></p>
+
+                <button type="submit" class="btn btn--primary auth-submit field--full">Cadastrar</button>
+            </form>
+
+            <p class="auth-switch">
+                Já tem uma conta?
+                <a href="/pages/auth/login.html">Entrar na conta</a>
+            </p>
+        </section>
+    </main>
+
+    <script src="/js/components.js" defer></script>
+    <script src="/js/especialidades.js" defer></script>
+    <script src="/js/auth/cadastro.js" defer></script>
+</body>
+
+</html>

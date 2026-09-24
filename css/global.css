@@ -34,7 +34,7 @@
 
 html {
     scroll-behavior: smooth;
-    overflow-x: hidden;
+    overflow-x: clip;
 }
 
 body {
@@ -44,7 +44,6 @@ body {
     background-color: var(--white);
     color: var(--primary);
     -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
 }
 
 h1, h2, h3 {
@@ -157,7 +156,8 @@ button {
 }
 
 .brand-logo {
-    height: 56px;
+    height: 120px;
+    margin: -30px -40px -30px -44px;
     width: auto;
     max-width: none;
     display: block;
@@ -179,7 +179,7 @@ button {
     font-weight: 500;
 }
 
-.site-nav a { color: var(--primary); }
+.site-nav a { color: var(--primary); white-space: nowrap; }
 .site-nav a:hover { color: var(--secondary); }
 
 .nav-cta--mobile { display: none; }
@@ -227,55 +227,98 @@ button {
 
 
 .site-footer {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 24px;
-    padding: 48px clamp(20px, 6vw, 64px);
-    background: var(--primary-32);
+    padding: 64px clamp(20px, 6vw, 64px) 28px;
+    background: var(--primary-18);
     color: var(--primary);
-    border-top: 1px solid var(--primary-18);
+}
+
+.footer-main {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 1fr;
+    gap: 40px;
+    max-width: var(--container);
+    margin: 0 auto;
 }
 
 .footer-brand {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+    gap: 12px;
 }
 
 .footer-logo {
-    height: 44px;
+    height: 110px;
+    margin: -26px 0 -22px -54px;
     width: auto;
     max-width: none;
     object-fit: contain;
-    align-self: flex-start;
-}
-
-.footer-brand strong {
-    font-family: var(--font-display);
-    font-size: 1.2rem;
-    color: var(--primary);
 }
 
 .footer-brand p {
-    color: rgba(13, 80, 23, .75);
-    margin-top: 6px;
+    color: var(--secondary);
     max-width: 32ch;
 }
 
+.footer-col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 8px;
+}
+
+.footer-col__title {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--secondary);
+    margin-bottom: 4px;
+}
+
+.footer-col a {
+    width: fit-content;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--primary);
+    transition: color .18s ease;
+}
+
+.footer-col a:hover { color: var(--secondary); text-decoration: underline; text-underline-offset: 4px; }
+
+.footer-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    max-width: var(--container);
+    margin: 48px auto 0;
+    padding-top: 24px;
+    border-top: 1px solid var(--primary-18);
+}
+
 .footer-copy {
-    color: rgba(13, 80, 23, .6);
+    color: var(--secondary);
     font-size: 0.85rem;
 }
+
+.footer-top {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.footer-top:hover { color: var(--secondary); }
 
 
 
 @media (max-width: 900px) {
-    .site-footer { flex-direction: column; align-items: flex-start; }
+    .footer-main { grid-template-columns: 1fr 1fr; }
+    .footer-brand { grid-column: 1 / -1; }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 1080px) {
     .site-nav {
         position: absolute;
         top: 100%;
@@ -308,7 +351,7 @@ button {
     .header-entrar { display: none; }
 
     .nav-toggle:checked ~ .site-header .site-nav {
-        max-height: 320px;
+        max-height: 380px;
         padding: 16px clamp(20px, 6vw, 64px) 24px;
         border-bottom: 1px solid var(--gray-light);
     }
@@ -325,6 +368,13 @@ button {
     .nav-toggle:checked ~ .site-header .nav-burger span::after {
         top: 0;
         transform: rotate(-45deg);
+    }
+}
+
+@media (max-width: 720px) {
+    .brand-logo {
+        height: 96px;
+        margin: -24px -32px -24px -30px;
     }
 }
 

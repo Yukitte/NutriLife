@@ -1,0 +1,253 @@
+.greeting {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: clamp(28px, 5vw, 52px);
+    margin-bottom: clamp(56px, 9vw, 96px);
+    background: var(--primary-06);
+    border: 1px solid var(--primary-18);
+    border-radius: 28px;
+}
+
+.greeting .eyebrow { margin-bottom: 10px; }
+
+.greeting h1 {
+    font-family: var(--font-body);
+    font-size: clamp(1.8rem, 3.5vw, 2.3rem);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+.greeting__text p {
+    max-width: 48ch;
+    margin-top: 14px;
+    font-size: 1rem;
+}
+
+.greeting__avatar {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: clamp(64px, 12vw, 88px);
+    height: clamp(64px, 12vw, 88px);
+    border-radius: 50%;
+    background: var(--primary);
+    font-size: clamp(1.4rem, 3vw, 1.8rem);
+    font-weight: 600;
+    color: var(--white);
+    box-shadow: 0 0 0 6px var(--white);
+}
+
+
+
+.nutri-search__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+}
+
+.nutri-count {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--secondary);
+}
+
+.nutri-filters {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 20px 32px;
+    margin: 28px 0 40px;
+}
+
+.distance-filter,
+.specialty-filter {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.filter-label {
+    margin-right: 6px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.specialty-filter select {
+    appearance: none;
+    min-width: 240px;
+    padding: 9px 40px 9px 16px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--primary);
+    background: var(--white) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23336633" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>') no-repeat right 14px center / 16px;
+    border: 1px solid var(--gray-light);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.specialty-filter select:hover { border-color: var(--secondary); }
+
+.specialty-filter select:focus {
+    outline: none;
+    border-color: var(--secondary);
+    box-shadow: 0 0 0 3px var(--primary-18);
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--gray-light);
+    background: var(--white);
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--primary);
+    transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.chip:hover { border-color: var(--secondary); }
+
+.chip--active {
+    border-color: var(--secondary);
+    box-shadow: inset 0 0 0 1px var(--secondary);
+    font-weight: 600;
+}
+
+.chip--active::before {
+    content: "";
+    width: 14px;
+    height: 14px;
+    background-color: var(--secondary);
+    -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>') no-repeat center / contain;
+    mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>') no-repeat center / contain;
+}
+
+
+
+.nutri-grid {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 28px;
+}
+
+.nutri-card {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 28px;
+    background: var(--white);
+    border: 1px solid var(--gray-light);
+    border-radius: var(--radius);
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.nutri-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 32px -20px rgba(13, 80, 23, .35);
+}
+
+.nutri-card__top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.nutri-card__avatar {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--secondary);
+    color: var(--white);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.nutri-card__info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.nutri-card__info strong {
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+.nutri-card__specialty {
+    font-size: 0.88rem;
+    color: var(--secondary);
+}
+
+.nutri-card__distance {
+    align-self: flex-start;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--primary-08);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--primary);
+    white-space: nowrap;
+}
+
+.nutri-card__bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 20px;
+    border-top: 1px solid var(--gray-light);
+}
+
+.nutri-card__price {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.78rem;
+    color: var(--secondary);
+}
+
+.nutri-card__price strong {
+    font-size: 1.1rem;
+    color: var(--primary);
+}
+
+.nutri-card__btn {
+    padding: 10px 22px;
+    font-size: 0.88rem;
+}
+
+.nutri-empty {
+    padding: 28px;
+    text-align: center;
+    background: var(--primary-06);
+    border-radius: var(--radius);
+}
+
+
+
+@media (max-width: 720px) {
+    .nutri-grid { grid-template-columns: 1fr; }
+
+    .specialty-filter { width: 100%; }
+    .specialty-filter select { flex: 1; min-width: 0; }
+
+    .greeting { align-items: flex-start; gap: 16px; }
+    .greeting__avatar { width: 48px; height: 48px; font-size: 1.2rem; box-shadow: 0 0 0 4px var(--white); }
+}

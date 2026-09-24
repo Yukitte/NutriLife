@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="./css/global.css">
-    <link rel="stylesheet" href="./css/home.css">
+    <link rel="stylesheet" href="./css/landing/home.css">
 </head>
 
 <body>
@@ -30,12 +30,18 @@
 
                 <p>
                     O NutriLife conecta pacientes e nutricionistas
-                    em um único lugar, tornando o acompanhamento
-                    nutricional mais organizado, próximo e acessível.
+                    em um único lugar: encontre profissionais perto
+                    de você e tenha um acompanhamento nutricional
+                    mais organizado, próximo e acessível.
                 </p>
-                <a href="./pages/auth/login.html" class="btn btn--primary">
-                    Começar agora
-                </a>
+                <div class="hero-actions">
+                    <a href="./pages/auth/login.html" class="btn btn--primary">
+                        Começar agora
+                    </a>
+                    <a href="#encontrar" class="btn btn--ghost">
+                        Encontrar nutricionista
+                    </a>
+                </div>
             </div>
 
             <div class="hero-art" aria-hidden="true">
@@ -73,6 +79,89 @@
                 nutricionista uma forma mais organizada de cuidar
                 de seus pacientes.
             </p>
+        </section>
+
+        <section id="encontrar" class="section finder">
+            <div class="finder-copy">
+                <span class="eyebrow">Nutricionistas perto de você</span>
+                <h2>
+                    Encontre o nutricionista
+                    ideal na sua região.
+                </h2>
+                <p>
+                    Com o NutriLife você descobre nutricionistas
+                    próximos da sua localização, conhece o perfil
+                    de cada profissional e agenda sua consulta
+                    sem sair da plataforma.
+                </p>
+
+                <ul class="finder-list">
+                    <li data-icon="pin">
+                        <strong>Busca por localização</strong>
+                        Veja os profissionais mais próximos de você e a distância até cada um.
+                    </li>
+                    <li data-icon="filter">
+                        <strong>Filtros por especialidade</strong>
+                        Esportiva, clínica, materno-infantil, vegetariana e muito mais.
+                    </li>
+                    <li data-icon="profile">
+                        <strong>Perfil completo</strong>
+                        Formação, formas de atendimento e avaliações de outros pacientes.
+                    </li>
+                    <li data-icon="calendar">
+                        <strong>Agendamento direto</strong>
+                        Escolha o horário e marque sua consulta em poucos cliques.
+                    </li>
+                </ul>
+
+                <a href="./pages/auth/login.html" class="btn btn--primary">
+                    Buscar nutricionistas
+                </a>
+            </div>
+
+            <div class="finder-demo" aria-hidden="true">
+                <div class="finder-search">
+                    <span class="finder-search__pin"></span>
+                    <span>Perto de: <strong>Taguatinga, Brasília - DF</strong></span>
+                </div>
+
+                <div class="finder-filters">
+                    <span class="finder-filters__label">Filtros</span>
+                    <div class="finder-chips">
+                        <span class="finder-chip finder-chip--active">Até 5 km</span>
+                        <span class="finder-chip">Esportiva</span>
+                        <span class="finder-chip">Materno-infantil</span>
+                        <span class="finder-chip">Online</span>
+                    </div>
+                </div>
+
+                <article class="finder-result">
+                    <span class="finder-result__avatar">AF</span>
+                    <div>
+                        <strong>Dra. Ana Ferreira</strong>
+                        <span>Nutrição clínica · ★ 4,9</span>
+                    </div>
+                    <span class="finder-result__distance">1,2 km</span>
+                </article>
+
+                <article class="finder-result">
+                    <span class="finder-result__avatar">RS</span>
+                    <div>
+                        <strong>Dr. Rafael Souza</strong>
+                        <span>Nutrição esportiva · ★ 4,8</span>
+                    </div>
+                    <span class="finder-result__distance">2,7 km</span>
+                </article>
+
+                <article class="finder-result">
+                    <span class="finder-result__avatar">MC</span>
+                    <div>
+                        <strong>Dra. Marina Costa</strong>
+                        <span>Materno-infantil · ★ 5,0</span>
+                    </div>
+                    <span class="finder-result__distance">4,1 km</span>
+                </article>
+            </div>
         </section>
 
         <!-- Para pacientes -->
@@ -138,7 +227,8 @@
                 </h2>
                 <p>
                     Tenha uma visão centralizada dos seus pacientes,
-                    planos alimentares, consultas e comunicação.
+                    planos alimentares, consultas e comunicação — e
+                    seja encontrado por pacientes da sua região.
                 </p>
             </div>
 
@@ -193,9 +283,10 @@
             <div class="how-steps">
                 <article class="how-step">
                     <span class="how-step__number">01</span>
-                    <h3>Entre na plataforma</h3>
+                    <h3>Encontre seu nutricionista</h3>
                     <p>
-                        Acesse sua conta de forma rápida e segura.
+                        Crie sua conta e descubra profissionais
+                        perto de você.
                     </p>
                 </article>
 

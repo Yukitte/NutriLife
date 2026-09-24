@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Agendar consulta | NutriLife</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/css/global.css">
+    <link rel="stylesheet" href="/css/paciente/layout.css">
+    <link rel="stylesheet" href="/css/paciente/agenda-nutricionista.css">
+</head>
+
+<body class="app-page">
+
+    <div data-component="header-paciente"></div>
+
+    <main class="app-main app-main--wide">
+        <a class="back-link" id="voltar-perfil" href="/pages/paciente/home.html">← Voltar para o perfil</a>
+
+        <div id="agenda" hidden>
+            <section class="agenda-head">
+                <span class="agenda-head__avatar" id="agenda-avatar" aria-hidden="true"></span>
+                <div>
+                    <span class="eyebrow">Agendar consulta</span>
+                    <h1 id="agenda-nome"></h1>
+                    <p id="agenda-resumo"></p>
+                </div>
+            </section>
+
+            <div class="agenda-layout">
+                <section class="calendar" aria-labelledby="calendar-titulo">
+                    <div class="calendar__toolbar">
+                        <button type="button" class="calendar__nav" id="mes-anterior" aria-label="Mês anterior">‹</button>
+                        <h2 id="calendar-titulo" aria-live="polite"></h2>
+                        <button type="button" class="calendar__nav" id="mes-seguinte" aria-label="Próximo mês">›</button>
+                    </div>
+
+                    <div class="calendar__weekdays" aria-hidden="true">
+                        <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+                    </div>
+
+                    <div class="calendar__grid" id="calendar-grid"></div>
+
+                    <ul class="calendar__legend">
+                        <li><span class="legend-dot legend-dot--disponivel"></span>Horários disponíveis</li>
+                        <li><span class="legend-dot legend-dot--ultima"></span>Última vaga</li>
+                        <li><span class="legend-dot legend-dot--fechada"></span>Sem vagas</li>
+                        <li><span class="legend-dot legend-dot--marcada"></span>Sua consulta</li>
+                    </ul>
+                </section>
+
+                <aside class="booking" aria-live="polite">
+                    <div class="booking__empty" id="booking-vazio">
+                        <h2>Escolha um dia</h2>
+                        <p>Toque em um dia com horários disponíveis no calendário para ver as opções.</p>
+                    </div>
+
+                    <form class="booking__form" id="booking-form" hidden>
+                        <span class="eyebrow">Horários disponíveis</span>
+                        <h2 id="booking-data"></h2>
+
+                        <div class="time-slots" id="horarios" role="radiogroup" aria-label="Horário da consulta"></div>
+
+                        <fieldset class="booking__mode" id="modalidade-grupo">
+                            <legend>Tipo de atendimento</legend>
+                            <div class="mode-options" id="modalidades"></div>
+                        </fieldset>
+
+                        <div class="booking__total">
+                            <span>Valor da consulta</span>
+                            <strong id="booking-valor"></strong>
+                        </div>
+
+                        <button type="submit" class="btn btn--primary booking__submit" id="confirmar" disabled>Confirmar agendamento</button>
+                    </form>
+
+                    <div class="booking__success" id="booking-sucesso" hidden>
+                        <span class="booking__success-icon" aria-hidden="true"></span>
+                        <h2>Consulta marcada!</h2>
+                        <p id="booking-sucesso-texto"></p>
+                        <button type="button" class="btn btn--ghost" id="marcar-outra">Escolher outro horário</button>
+                    </div>
+                </aside>
+            </div>
+        </div>
+
+        <section class="agenda-not-found" id="agenda-nao-encontrada" hidden>
+            <h1>Nutricionista não encontrado</h1>
+            <p>A agenda que você tentou abrir não existe ou não está mais disponível.</p>
+            <a href="/pages/paciente/home.html" class="btn btn--primary">Ver nutricionistas</a>
+        </section>
+    </main>
+
+    <a class="whatsapp-fab" id="whatsapp-suporte" target="_blank" rel="noopener" aria-label="Falar com o suporte pelo WhatsApp" hidden></a>
+
+    <div data-component="footer-app"></div>
+
+    <script src="/js/components.js" defer></script>
+    <script src="/js/paciente/layout.js" defer></script>
+    <script src="/js/paciente/nutricionistas.mock.js" defer></script>
+    <script src="/js/paciente/agenda.mock.js" defer></script>
+    <script src="/js/paciente/agenda-nutricionista.js" defer></script>
+</body>
+
+</html>
