@@ -132,9 +132,9 @@ conta existente, redefina sua senha localmente com `python reset_password.py`
 
 ### MVP funcional
 
-* Cadastro público de pacientes e nutricionistas (CRN informado, sem validação externa), login e redefinição de senha.
-* Busca pública de nutricionistas por estado e perfis profissionais.
-* Disponibilidade semanal, reserva de horário, link PagSeguro e confirmação manual com link do Teams.
+* Cadastro público de pacientes e nutricionistas (CRN informado, sem validação externa), com páginas de login e cadastro dedicadas e redefinição de senha.
+* Área inicial do paciente com resumo de planos e consultas, busca de nutricionistas por estado e perfis profissionais.
+* Disponibilidade semanal, perfil profissional público e reserva de horário com confirmação manual de pagamento e link do Teams.
 * Consultas, pacientes e planos alimentares em páginas separadas.
 * Planos com objetivo, duração e refeições compostas por alimentos, quantidades, medidas, calorias e nutrientes.
 * Busca por alimento e categoria no catálogo TACO em português, com porções e cálculo nutricional por gramas; o USDA FoodData Central é mantido como alternativa.

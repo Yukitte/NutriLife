@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minha área | NutriLife</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body data-page="patient-home">
+    <div class="dashboard-shell">
+        <aside class="dashboard-sidebar">
+            <div class="brand">
+                <a href="../index.html">
+                    <img src="../assets/images/NutriLife-logo-semfundo.png" alt="NutriLife" class="brand-logo">
+                </a>
+            </div>
+            <nav class="sidebar-nav" aria-label="Navegação do painel">
+                <a href="./home-paciente.html" class="sidebar-link is-active" aria-current="page">Minha área</a>
+                <a href="./busca.html" class="sidebar-link">Buscar nutricionista</a>
+                <a href="./planos.html" class="sidebar-link">Planos alimentares</a>
+                <a href="./consultas.html" class="sidebar-link">Agendamentos</a>
+            </nav>
+            <button id="logout-button" class="sidebar-logout" type="button">Sair</button>
+        </aside>
+
+        <main class="dashboard-main patient-home">
+            <header class="dashboard-header patient-home__welcome">
+                <div>
+                    <span class="eyebrow" id="today-date"></span>
+                    <h1>Olá, <span id="user-name">Paciente</span></h1>
+                    <p>Seu acompanhamento nutricional em um só lugar.</p>
+                </div>
+                <a class="btn btn--primary" href="./busca.html">Encontrar nutricionista</a>
+            </header>
+
+            <p id="dashboard-status" class="dashboard-status" role="alert" hidden></p>
+
+            <section class="dashboard-kpis patient-home__summary" aria-label="Resumo do acompanhamento">
+                <article class="kpi-card">
+                    <span class="kpi-card__label">Planos alimentares</span>
+                    <div id="patient-plans-count" class="kpi-card__value">—</div>
+                    <a href="./planos.html">Consultar planos</a>
+                </article>
+                <article class="kpi-card">
+                    <span class="kpi-card__label">Agendamentos</span>
+                    <div id="patient-appointments-count" class="kpi-card__value">—</div>
+                    <a href="./consultas.html">Ver consultas</a>
+                </article>
+            </section>
+
+            <section class="patient-home__directory" aria-labelledby="nutritionists-heading">
+                <div class="patient-home__section-heading">
+                    <div>
+                        <span class="eyebrow">Profissionais</span>
+                        <h2 id="nutritionists-heading">Encontre seu nutricionista</h2>
+                        <p>Conheça os perfis disponíveis e escolha quem acompanha melhor seus objetivos.</p>
+                    </div>
+                    <a class="btn btn--ghost" href="./busca.html">Busca completa</a>
+                </div>
+
+                <section class="panel">
+                    <form id="search-form" class="dashboard-form search-filters">
+                        <div class="input-group">
+                            <label for="state-filter">Filtrar por estado</label>
+                            <select id="state-filter" name="estado">
+                                <option value="">Todos os estados</option>
+                                <option>AC</option><option>AL</option><option>AP</option><option>AM</option><option>BA</option>
+                                <option>CE</option><option>DF</option><option>ES</option><option>GO</option><option>MA</option>
+                                <option>MT</option><option>MS</option><option>MG</option><option>PA</option><option>PB</option>
+                                <option>PR</option><option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+                                <option>RS</option><option>RO</option><option>RR</option><option>SC</option><option>SP</option>
+                                <option>SE</option><option>TO</option>
+                            </select>
+                        </div>
+                        <p class="item-meta">A lista mostra profissionais cadastrados; a plataforma ainda não filtra por distância.</p>
+                        <button class="btn btn--primary" type="submit">Buscar</button>
+                    </form>
+                </section>
+                <section class="directory-grid" id="nutritionists-list" aria-live="polite"></section>
+            </section>
+        </main>
+    </div>
+    <script src="../config.js" defer></script>
+    <script src="../js/api.js" defer></script>
+    <script src="../js/app.js" defer></script>
+</body>
+</html>

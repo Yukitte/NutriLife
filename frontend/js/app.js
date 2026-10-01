@@ -112,25 +112,33 @@ function initAuthPage() {
         return;
     }
 
-    document.getElementById("login-form").addEventListener("submit", (event) => {
-        submitAuthForm(event, ({ email, senha }) => api.login({ email, senha }));
-    });
-    document.getElementById("register-form").addEventListener("submit", (event) => {
-        submitAuthForm(event, (values) => api.cadastrarUsuario(values));
-    });
+    const loginForm = document.getElementById("login-form");
+    if (loginForm) {
+        loginForm.addEventListener("submit", (event) => {
+            submitAuthForm(event, ({ email, senha }) => api.login({ email, senha }));
+        });
+    }
+    const registerForm = document.getElementById("register-form");
+    if (registerForm) {
+        registerForm.addEventListener("submit", (event) => {
+            submitAuthForm(event, (values) => api.cadastrarUsuario(values));
+        });
+    }
     document.querySelectorAll(".auth-tab").forEach((tab) => {
         tab.addEventListener("click", () => switchAuthTab(tab.dataset.authTab));
     });
     const typeSelect = document.getElementById("register-type");
     const crnGroup = document.getElementById("register-crn-group");
     const crnInput = document.getElementById("register-crn");
-    const updateCrnRequirement = () => {
-        const isNutritionist = typeSelect.value === "nutricionista";
-        crnGroup.hidden = !isNutritionist;
-        crnInput.required = isNutritionist;
-    };
-    typeSelect.addEventListener("change", updateCrnRequirement);
-    updateCrnRequirement();
+    if (typeSelect && crnGroup && crnInput) {
+        const updateCrnRequirement = () => {
+            const isNutritionist = typeSelect.value === "nutricionista";
+            crnGroup.hidden = !isNutritionist;
+            crnInput.required = isNutritionist;
+        };
+        typeSelect.addEventListener("change", updateCrnRequirement);
+        updateCrnRequirement();
+    }
 }
 
 function createElement(tag, className, text) {
@@ -697,9 +705,11 @@ async function loadSearchPage(user) {
         return;
     }
     const dateElement = document.getElementById("today-date");
-    dateElement.textContent = new Intl.DateTimeFormat("pt-BR", {
-        dateStyle: "full",
-    }).format(new Date());
+    if (dateElement) {
+        dateElement.textContent = new Intl.DateTimeFormat("pt-BR", {
+            dateStyle: "full",
+        }).format(new Date());
+    }
     const results = document.getElementById("nutritionists-list");
 
     async function search(state) {
@@ -738,6 +748,20 @@ async function loadSearchPage(user) {
         search(document.getElementById("state-filter").value);
     });
     await search("");
+}
+
+async function loadPatientHomePage(user) {
+    if (user.perfil !== "paciente") {
+        window.location.replace("../dashboard.html");
+        return;
+    }
+    const [plans, appointments] = await Promise.all([
+        api.listarPlanos(),
+        api.listarConsultas(),
+    ]);
+    document.getElementById("patient-plans-count").textContent = String(plans.length);
+    document.getElementById("patient-appointments-count").textContent = String(appointments.length);
+    await loadSearchPage(user);
 }
 
 async function loadProfessionalProfile(user) {
@@ -1303,7 +1327,7 @@ async function setCurrentUser() {
         const link = document.getElementById(id);
         if (link) link.hidden = user.perfil !== "nutricionista";
     });
-    const patientOnlyLinks = ["search-nav"];
+    const patientOnlyLinks = ["search-nav", "patient-home-nav", "patient-home-action"];
     patientOnlyLinks.forEach((id) => {
         const link = document.getElementById(id);
         if (link) link.hidden = user.perfil !== "paciente";
@@ -1377,6 +1401,7 @@ async function loadCurrentPage() {
     if (page === "plans") return loadPlansPage(user);
     if (page === "patients") return loadPatientsPage(user);
     if (page === "search") return loadSearchPage(user);
+    if (page === "patient-home") return loadPatientHomePage(user);
     if (page === "professional-profile") return loadProfessionalProfile(user);
     if (page === "booking") return loadBookingPage(user);
     if (page === "appointments") return loadAppointmentsPage(user);
@@ -1439,7 +1464,7 @@ function initProtectedPage() {
 document.addEventListener("DOMContentLoaded", () => {
     if (document.body.dataset.page === "auth") initAuthPage();
     if (document.body.dataset.page === "password-reset") initPasswordResetPage();
-    if (["dashboard", "plans", "patients", "search", "professional-profile", "booking", "appointments", "professional-calendar", "professional-profile-edit"].includes(document.body.dataset.page)) {
+    if (["dashboard", "plans", "patients", "search", "patient-home", "professional-profile", "booking", "appointments", "professional-calendar", "professional-profile-edit"].includes(document.body.dataset.page)) {
         initProtectedPage();
     }
 });

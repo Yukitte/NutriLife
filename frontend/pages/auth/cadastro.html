@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criar conta | NutriLife</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../../css/styles.css">
+</head>
+<body data-page="auth">
+    <main class="auth-page">
+        <section class="auth-panel auth-panel--standalone">
+            <a class="auth-brand" href="../../index.html" aria-label="NutriLife - página inicial">
+                <img src="../../assets/images/NutriLife-logo-semfundo.png" alt="NutriLife">
+            </a>
+            <span class="eyebrow">Comece seu acompanhamento</span>
+            <h1 class="auth-title">Crie sua conta</h1>
+            <p class="auth-intro">Cadastre-se para começar sua jornada nutricional.</p>
+
+            <form id="register-form" class="auth-form is-active" data-auth-form="register">
+                <div class="input-group">
+                    <label for="register-name">Nome completo</label>
+                    <input id="register-name" name="nome" type="text" placeholder="Seu nome" autocomplete="name" minlength="2" maxlength="120" required>
+                </div>
+                <div class="input-group">
+                    <label for="register-email">E-mail</label>
+                    <input id="register-email" name="email" type="email" placeholder="seu@email.com" autocomplete="email" required>
+                </div>
+                <div class="input-group">
+                    <label for="register-phone">Telefone com DDD</label>
+                    <input id="register-phone" name="telefone" type="tel" autocomplete="tel" required>
+                </div>
+                <div class="input-group">
+                    <label for="register-address">Endereço</label>
+                    <input id="register-address" name="endereco" autocomplete="street-address" required>
+                </div>
+                <div class="registration-location">
+                    <div class="input-group">
+                        <label for="register-cep">CEP</label>
+                        <input id="register-cep" name="cep" inputmode="numeric" autocomplete="postal-code" minlength="8" maxlength="9" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="register-state">Estado (UF)</label>
+                        <select id="register-state" name="estado" required>
+                            <option value="">Selecione</option>
+                            <option>AC</option><option>AL</option><option>AP</option><option>AM</option><option>BA</option>
+                            <option>CE</option><option>DF</option><option>ES</option><option>GO</option><option>MA</option>
+                            <option>MT</option><option>MS</option><option>MG</option><option>PA</option><option>PB</option>
+                            <option>PR</option><option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+                            <option>RS</option><option>RO</option><option>RR</option><option>SC</option><option>SP</option>
+                            <option>SE</option><option>TO</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label for="register-password">Senha</label>
+                    <input id="register-password" name="senha" type="password" placeholder="Mínimo de 8 caracteres" autocomplete="new-password" minlength="8" maxlength="128" required>
+                </div>
+                <div class="input-group">
+                    <label for="register-type">Tipo de conta</label>
+                    <select id="register-type" name="tipo" required>
+                        <option value="paciente">Paciente</option>
+                        <option value="nutricionista">Nutricionista</option>
+                    </select>
+                </div>
+                <div class="input-group" id="register-crn-group" hidden>
+                    <label for="register-crn">CRN</label>
+                    <input id="register-crn" name="crn" minlength="4" maxlength="20">
+                </div>
+                <button type="submit" class="btn btn--primary">Criar conta</button>
+                <p class="auth-status" aria-live="polite"></p>
+            </form>
+
+            <p class="auth-meta">Já tem conta? <a href="./login.html">Entrar</a></p>
+            <p class="auth-meta">Nutricionistas informam o CRN no cadastro. O CRN informado não é verificado automaticamente.</p>
+        </section>
+    </main>
+    <script src="../../config.js" defer></script>
+    <script src="../../js/api.js" defer></script>
+    <script src="../../js/app.js" defer></script>
+</body>
+</html>
