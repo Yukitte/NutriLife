@@ -1,5 +1,5 @@
 (function () {
-    const PARTIALS_DIR = "/components";
+    const PARTIALS_DIR = "./components";
 
     async function loadComponent(el) {
         const name = el.getAttribute("data-component");
