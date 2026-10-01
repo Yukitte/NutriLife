@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entrar | NutriLife</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../../css/styles.css">
+</head>
+<body data-page="auth">
+    <main class="auth-page">
+        <div class="auth-card">
+            <section class="auth-illustration" aria-label="Resumo do NutriLife">
+                <span class="eyebrow">Acesso NutriLife</span>
+                <h1>Seu cuidado nutricional em um só lugar.</h1>
+                <p>
+                    Acompanhe consultas, metas, planos alimentares e comunicação com o seu suporte em uma experiência simples e clara.
+                </p>
+
+                <div class="auth-highlight-list">
+                    <span class="auth-highlight">Consultas organizadas</span>
+                    <span class="auth-highlight">Planos personalizados</span>
+                    <span class="auth-highlight">Acompanhamento contínuo</span>
+                </div>
+            </section>
+
+            <section class="auth-panel">
+                <div class="auth-header">
+                    <div class="auth-tabs" role="tablist" aria-label="Autenticação do NutriLife">
+                        <button type="button" class="auth-tab is-active" data-auth-tab="login" aria-selected="true">Entrar</button>
+                        <button type="button" class="auth-tab" data-auth-tab="register" aria-selected="false">Criar conta</button>
+                    </div>
+                </div>
+
+                <form id="login-form" class="auth-form is-active" data-auth-form="login">
+                    <div class="input-group">
+                        <label for="login-email">E-mail</label>
+                        <input id="login-email" name="email" type="email" placeholder="seu@email.com" autocomplete="email" required>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="login-password">Senha</label>
+                        <input id="login-password" name="senha" type="password" placeholder="Sua senha" autocomplete="current-password" required>
+                    </div>
+
+                    <button type="submit" class="btn btn--primary">Entrar</button>
+                    <p class="auth-status" aria-live="polite"></p>
+                </form>
+
+                <form id="register-form" class="auth-form" data-auth-form="register">
+                    <div class="input-group">
+                        <label for="register-name">Nome completo</label>
+                        <input id="register-name" name="nome" type="text" placeholder="Seu nome" autocomplete="name" minlength="2" maxlength="120" required>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="register-email">E-mail</label>
+                        <input id="register-email" name="email" type="email" placeholder="seu@email.com" autocomplete="email" required>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="register-password">Senha</label>
+                        <input id="register-password" name="senha" type="password" placeholder="Crie uma senha (mínimo 8 caracteres)" autocomplete="new-password" minlength="8" maxlength="128" required>
+                    </div>
+
+                    <button type="submit" class="btn btn--primary">Criar conta</button>
+                    <p class="auth-status" aria-live="polite"></p>
+                </form>
+
+                <p class="auth-meta">O cadastro público cria uma conta de paciente. Contas profissionais são provisionadas pela equipe.</p>
+            </section>
+        </div>
+    </main>
+
+    <script src="../../config.js" defer></script>
+    <script src="../../js/api.js" defer></script>
+    <script src="../../js/app.js" defer></script>
+</body>
+</html>
