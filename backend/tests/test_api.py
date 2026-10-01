@@ -5,9 +5,11 @@ from pydantic import ValidationError
 
 import main
 from crud.usuario_crud import _serializar_profissional
-from routers import auth_router, usuario_router
+from routers import alimento_router, auth_router, usuario_router
 from schemas.consulta_schema import DisponibilidadeUpdate
+from schemas.plano_schema import OpcaoAlimento
 from schemas.usuario_schema import UsuarioCreate, UsuarioUpdate
+from scripts.build_taco_catalog import _nutrient_value
 from security import (
     create_access_token,
     create_password_reset_token,
@@ -194,6 +196,121 @@ def test_patient_cannot_create_plan(client, monkeypatch):
     )
 
     assert response.status_code == 403
+
+
+def test_food_catalog_search_is_public_and_includes_portions(client, monkeypatch):
+    foods = [{
+        "id": "fixture-1",
+        "name": "Arroz integral cozido",
+        "category": "Cereais e derivados",
+        "nutrients_per_100g": {"energia_kcal": 124, "proteina_g": 2.6},
+        "portions": [{"label": "100 g", "gram_weight": 100}],
+    }]
+    monkeypatch.setattr(alimento_router, "carregar_alimentos", lambda: foods)
+    monkeypatch.setattr(
+        alimento_router,
+        "buscar_alimento_por_id",
+        lambda food_id: foods[0] if food_id == "fixture-1" else None,
+    )
+    response = client.get("/alimentos?busca=arroz")
+
+    assert response.status_code == 200
+    assert response.json()["total"] > 0
+    food = response.json()["items"][0]
+    assert food["id"]
+    assert food["nutrients_per_100g"]["energia_kcal"] > 0
+    assert food["portions"]
+
+
+def test_food_catalog_returns_categories_and_food_details(client, monkeypatch):
+    foods = [{
+        "id": "fixture-1",
+        "name": "Arroz integral cozido",
+        "category": "Cereais e derivados",
+        "nutrients_per_100g": {"energia_kcal": 124},
+        "portions": [{"label": "100 g", "gram_weight": 100}],
+    }]
+    monkeypatch.setattr(alimento_router, "carregar_alimentos", lambda: foods)
+    monkeypatch.setattr(alimento_router, "carregar_fonte", lambda: {"name": "TACO"})
+    monkeypatch.setattr(
+        alimento_router,
+        "buscar_alimento_por_id",
+        lambda food_id: foods[0] if food_id == "fixture-1" else None,
+    )
+    categories = client.get("/alimentos/categorias")
+    food = client.get("/alimentos/fixture-1")
+    source = client.get("/alimentos/fonte")
+
+    assert categories.status_code == 200
+    assert "Cereais e derivados" in categories.json()
+    assert food.status_code == 200
+    assert food.json()["name"] == "Arroz integral cozido"
+    assert source.json()["name"] == "TACO"
+
+
+def test_plan_food_nutrients_are_recomputed_from_catalog(monkeypatch):
+    import schemas.plano_schema as plano_schema
+
+    monkeypatch.setattr(
+        plano_schema,
+        "buscar_alimento_por_id",
+        lambda _: {
+            "id": "taco-fixture",
+            "name": "Arroz, integral, cozido",
+            "category": "Cereais e derivados",
+            "nutrients_per_100g": {
+                "energia_kcal": 123.5348925,
+                "proteina_g": 2.58825,
+                "carboidrato_g": 25.80975,
+                "gordura_g": 1.000333,
+                "fibra_g": 2.74933,
+                "sodio_mg": 1.24467,
+            },
+        },
+    )
+    monkeypatch.setattr(
+        plano_schema,
+        "carregar_fonte",
+        lambda: {"name": "Tabela Brasileira de Composição de Alimentos (TACO)"},
+    )
+    option = OpcaoAlimento(
+        nome="valor adulterado",
+        quantidade=150,
+        medida="g",
+        calorias=1,
+        alimento_id="taco-fixture",
+        proteina_g=999,
+    )
+
+    assert option.nome == "Arroz, integral, cozido"
+    assert option.calorias == 185
+    assert option.proteina_g == pytest.approx(3.882375)
+    assert option.categoria == "Cereais e derivados"
+    assert option.fonte_dados.endswith("(TACO)")
+
+
+def test_catalog_food_option_rejects_unknown_id(monkeypatch):
+    import schemas.plano_schema as plano_schema
+
+    monkeypatch.setattr(plano_schema, "buscar_alimento_por_id", lambda _: None)
+    with pytest.raises(ValidationError):
+        OpcaoAlimento(
+            nome="Banana",
+            quantidade=100,
+            medida="g",
+            calorias=89,
+            alimento_id="999999999",
+        )
+
+
+@pytest.mark.parametrize("value", ["Tr", "NA", "ND", "*", None, ""])
+def test_taco_non_numeric_markers_are_kept_as_missing(value):
+    assert _nutrient_value(value) is None
+
+
+def test_taco_importer_parses_portuguese_decimal_values():
+    assert _nutrient_value("12,5") == 12.5
+    assert _nutrient_value("0.25") == 0.25
 
 
 def test_passwords_are_hashed_and_access_tokens_expire():

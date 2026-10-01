@@ -75,6 +75,17 @@
         excluirPlano: (id) => request(`/planos/${encodeURIComponent(id)}`, {
             method: "DELETE",
         }),
+        listarCategoriasAlimentos: () => request("/alimentos/categorias"),
+        obterFonteAlimentos: () => request("/alimentos/fonte"),
+        obterAlimento: (id) => request(`/alimentos/${encodeURIComponent(id)}`),
+        buscarAlimentos: (busca, categoria, offset) => {
+            const params = new URLSearchParams();
+            if (busca) params.set("busca", busca);
+            if (categoria) params.set("categoria", categoria);
+            params.set("limit", "20");
+            params.set("offset", String(offset || 0));
+            return request(`/alimentos?${params}`);
+        },
         obterHorarios: (id, inicio, fim) => {
             const params = new URLSearchParams({
                 nutricionista_id: id,

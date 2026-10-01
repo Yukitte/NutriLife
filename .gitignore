@@ -3,3 +3,5 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+backend/data/taco_4a_edicao.xlsx
+backend/data/taco_catalogo_local.json

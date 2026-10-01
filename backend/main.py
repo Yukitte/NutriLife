@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pymongo.errors import ServerSelectionTimeoutError
 
 from database.connection import get_client, get_database
+from routers.alimento_router import router as alimento_router
 from routers.auth_router import router as auth_router
 from routers.consulta_router import router as consulta_router
 from routers.plano_router import router as plano_router
@@ -64,6 +65,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(alimento_router)
 app.include_router(usuario_router)
 app.include_router(plano_router)
 app.include_router(consulta_router)

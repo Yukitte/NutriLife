@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import ValidationError
 
 from crud.plano_crud import (
     atualizar_plano,
@@ -22,7 +23,13 @@ def cadastrar_plano(
     plano: PlanoCreate,
     nutricionista: dict = Depends(require_nutritionist),
 ):
-    created = criar_plano(plano, nutricionista)
+    try:
+        created = criar_plano(plano, nutricionista)
+    except ValidationError as error:
+        raise HTTPException(
+            status_code=422,
+            detail=error.errors(include_context=False),
+        ) from error
     if created is None:
         raise HTTPException(status_code=404, detail="Paciente não encontrado.")
     return created
@@ -34,7 +41,13 @@ def editar_plano(
     changes: PlanoUpdate,
     nutricionista: dict = Depends(require_nutritionist),
 ):
-    updated = atualizar_plano(plano_id, changes, nutricionista)
+    try:
+        updated = atualizar_plano(plano_id, changes, nutricionista)
+    except ValidationError as error:
+        raise HTTPException(
+            status_code=422,
+            detail=error.errors(include_context=False),
+        ) from error
     if updated is None:
         raise HTTPException(status_code=404, detail="Plano não encontrado.")
     return updated

@@ -150,6 +150,141 @@ function inputGroup(labelText, input) {
     return group;
 }
 
+let foodCategoriesPromise;
+let foodSourcePromise;
+
+function nutrientText(value, unit) {
+    return value === null || value === undefined
+        ? "não informado"
+        : `${Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ${unit}`;
+}
+
+function updateCatalogOption(row) {
+    const food = row.catalogFood;
+    if (!food) return;
+    const grams = Number(row.querySelector('[name="quantidade"]').value);
+    const summary = row.querySelector(".food-nutrition-summary");
+    const calories = row.querySelector('[name="calorias"]');
+    if (!Number.isFinite(grams) || grams <= 0 || grams > 10000) {
+        summary.textContent = "Informe uma quantidade entre 0,01 e 10.000 g.";
+        return;
+    }
+
+    const nutrients = food.nutrients_per_100g;
+    const factor = grams / 100;
+    const energy = nutrients.energia_kcal;
+    calories.value = energy === null || energy === undefined
+        ? "0"
+        : String(Math.round(energy * factor));
+    row.dataset.energiaKcal = energy === null || energy === undefined
+        ? ""
+        : String(energy * factor);
+    ["proteina_g", "carboidrato_g", "gordura_g", "fibra_g", "sodio_mg"].forEach((key) => {
+        const value = nutrients[key];
+        row.dataset[key] = value === null || value === undefined
+            ? ""
+            : String(value * factor);
+    });
+    summary.textContent = [
+        `Energia: ${nutrientText(row.dataset.energiaKcal || null, "kcal")}`,
+        `Proteína: ${nutrientText(row.dataset.proteina_g || null, "g")}`,
+        `Carboidratos: ${nutrientText(row.dataset.carboidrato_g || null, "g")}`,
+        `Gorduras: ${nutrientText(row.dataset.gordura_g || null, "g")}`,
+        `Fibras: ${nutrientText(row.dataset.fibra_g || null, "g")}`,
+        `Sódio: ${nutrientText(row.dataset.sodio_mg || null, "mg")}`,
+    ].join(" · ");
+}
+
+function selectCatalogFood(row, food, savedOption) {
+    const foodName = row.querySelector('[name="alimento"]');
+    const measure = row.querySelector('[name="medida"]');
+    const quantity = row.querySelector('[name="quantidade"]');
+    const calories = row.querySelector('[name="calorias"]');
+    const portions = row.querySelector(".food-portion-select");
+    const saved = savedOption || {};
+    row.catalogFood = food;
+    row.dataset.foodId = food.id;
+    row.dataset.foodCategory = food.category;
+    foodName.value = food.name;
+
+    const portionOptions = [
+        { label: "100 g (referência)", gram_weight: 100 },
+        ...food.portions,
+    ];
+    portions.replaceChildren(...portionOptions.map((portion) =>
+        new Option(portion.label, String(portion.gram_weight))));
+    const savedPortionIndex = portionOptions.findIndex(
+        (portion) => portion.label === saved.porcao,
+    );
+    portions.selectedIndex = savedPortionIndex >= 0 ? savedPortionIndex : 0;
+    portions.disabled = false;
+    measure.value = "g";
+    measure.readOnly = true;
+    quantity.value = String(saved.quantidade || portionOptions[portions.selectedIndex].gram_weight);
+    quantity.max = "10000";
+    quantity.step = "0.01";
+    calories.readOnly = true;
+    row.dataset.portion = saved.porcao || portionOptions[portions.selectedIndex].label;
+    updateCatalogOption(row);
+}
+
+function clearCatalogFood(row) {
+    row.catalogFood = null;
+    delete row.dataset.foodId;
+    delete row.dataset.foodCategory;
+    delete row.dataset.portion;
+    [
+        "energiaKcal",
+        "proteina_g",
+        "carboidrato_g",
+        "gordura_g",
+        "fibra_g",
+        "sodio_mg",
+    ].forEach((key) => delete row.dataset[key]);
+    row.querySelector(".food-portion-select").replaceChildren(
+        new Option("Selecione um alimento do catálogo", ""),
+    );
+    row.querySelector(".food-portion-select").disabled = true;
+    row.querySelector('[name="medida"]').readOnly = false;
+    row.querySelector('[name="calorias"]').readOnly = false;
+    row.querySelector(".food-nutrition-summary").textContent = "";
+}
+
+function populateFoodCategories(select) {
+    if (!foodCategoriesPromise) foodCategoriesPromise = api.listarCategoriasAlimentos();
+    foodCategoriesPromise.then((categories) => {
+        if (!select.isConnected || select.options.length > 1) return;
+        categories.forEach((category) => select.add(new Option(category, category)));
+    }).catch((error) => {
+        const status = select.closest(".food-option-row")
+            .querySelector(".food-search-status");
+        status.textContent = `Não foi possível carregar categorias: ${error.message}`;
+    });
+}
+
+function populateFoodSource(target) {
+    if (!foodSourcePromise) foodSourcePromise = api.obterFonteAlimentos();
+    foodSourcePromise.then((source) => {
+        if (!target.isConnected) return;
+        target.replaceChildren();
+        const link = document.createElement("a");
+        link.href = source.source_url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = `${source.name} — ${source.publisher || source.citation}`;
+        const note = createElement(
+            "span",
+            "",
+            ` Valores por 100 g. ${source.note || ""}`,
+        );
+        target.append("Fonte de dados: ", link, note);
+    }).catch((error) => {
+        if (target.isConnected) {
+            target.textContent = `Não foi possível carregar a fonte dos alimentos: ${error.message}`;
+        }
+    });
+}
+
 function appendMealEditor(container, initialMeal) {
     const meal = initialMeal || {
         horario: "07:00",
@@ -177,9 +312,27 @@ function appendMealEditor(container, initialMeal) {
         const row = createElement("div", "food-option-row");
         const foodName = document.createElement("input");
         foodName.name = "alimento";
-        foodName.placeholder = "Alimento";
+        foodName.type = "search";
+        foodName.placeholder = "Digite para buscar na base USDA";
+        foodName.maxLength = 250;
         foodName.value = data.nome || "";
         foodName.required = true;
+        const category = document.createElement("select");
+        category.className = "food-category-select";
+        category.add(new Option("Todas as categorias", ""));
+        populateFoodCategories(category);
+        const results = createElement("div", "food-search-results");
+        results.setAttribute("role", "group");
+        results.setAttribute("aria-label", "Resultados de alimentos");
+        const searchStatus = createElement("p", "food-search-status item-meta");
+        searchStatus.setAttribute("role", "status");
+        searchStatus.setAttribute("aria-live", "polite");
+        const searchControls = createElement("div", "food-search-controls");
+        searchControls.append(inputGroup("Filtrar por categoria", category));
+        const sourceNote = createElement("p", "food-source-note item-meta");
+        populateFoodSource(sourceNote);
+        const searchPanel = createElement("div", "food-catalog-search");
+        searchPanel.append(sourceNote, searchControls, searchStatus, results);
         const quantity = document.createElement("input");
         quantity.name = "quantidade";
         quantity.type = "number";
@@ -192,6 +345,10 @@ function appendMealEditor(container, initialMeal) {
         measure.placeholder = "Medida (xícara, g...)";
         measure.value = data.medida || "";
         measure.required = true;
+        const portions = document.createElement("select");
+        portions.className = "food-portion-select";
+        portions.disabled = true;
+        portions.add(new Option("Selecione um alimento do catálogo", ""));
         const calories = document.createElement("input");
         calories.name = "calorias";
         calories.type = "number";
@@ -199,12 +356,110 @@ function appendMealEditor(container, initialMeal) {
         calories.step = "1";
         calories.value = data.calorias || 0;
         calories.required = true;
+        const nutritionSummary = createElement("p", "food-nutrition-summary item-meta");
+        nutritionSummary.setAttribute("aria-live", "polite");
+
+        let debounce;
+        let requestVersion = 0;
+        let searchOffset = 0;
+        let searchTotal = 0;
+        const runSearch = async (append) => {
+            const version = ++requestVersion;
+            const term = foodName.value.trim();
+            const foodCategory = category.value;
+            if (term.length < 2 && !foodCategory) {
+                results.replaceChildren();
+                searchOffset = 0;
+                searchTotal = 0;
+                searchStatus.textContent = "Digite ao menos 2 caracteres ou escolha uma categoria.";
+                return;
+            }
+            if (!append) searchOffset = 0;
+            const offset = searchOffset;
+            if (append) {
+                const previousMoreButton = results.querySelector(".food-search-more");
+                if (previousMoreButton) previousMoreButton.remove();
+            }
+            searchStatus.textContent = "Buscando alimentos...";
+            try {
+                const response = await api.buscarAlimentos(term, foodCategory, offset);
+                if (!row.isConnected || version !== requestVersion) return;
+                if (!append) results.replaceChildren();
+                response.items.forEach((food) => {
+                    const result = createElement(
+                        "button",
+                        "food-result",
+                        `${food.name} · ${food.category}`,
+                    );
+                    result.type = "button";
+                    result.addEventListener("click", () => {
+                        selectCatalogFood(row, food);
+                        results.replaceChildren();
+                        searchStatus.textContent =
+                            "Alimento USDA selecionado. Valores nutricionais calculados por gramas.";
+                    });
+                    results.append(result);
+                });
+                searchOffset = offset + response.items.length;
+                searchTotal = response.total;
+                if (searchOffset < searchTotal) {
+                    const more = createElement("button", "btn btn--ghost food-search-more", "Carregar mais alimentos");
+                    more.type = "button";
+                    more.addEventListener("click", () => runSearch(true));
+                    results.append(more);
+                }
+                searchStatus.textContent = response.total
+                    ? `${response.total} alimento(s) encontrado(s); exibindo ${searchOffset}.`
+                    : "Nenhum alimento encontrado para essa busca.";
+            } catch (error) {
+                if (row.isConnected && version === requestVersion) {
+                    searchStatus.textContent = `Erro ao buscar alimentos: ${error.message}`;
+                }
+            }
+        };
+        foodName.addEventListener("input", () => {
+            if (row.dataset.foodId) clearCatalogFood(row);
+            window.clearTimeout(debounce);
+            debounce = window.setTimeout(() => runSearch(false), 250);
+        });
+        category.addEventListener("change", () => runSearch(false));
+        portions.addEventListener("change", () => {
+            const selected = portions.selectedOptions[0];
+            if (!selected || !selected.value) return;
+            quantity.value = selected.value;
+            row.dataset.portion = selected.textContent || "";
+            updateCatalogOption(row);
+        });
+        quantity.addEventListener("input", () => {
+            if (row.dataset.foodId) updateCatalogOption(row);
+        });
+        measure.addEventListener("input", () => {
+            if (row.dataset.foodId) clearCatalogFood(row);
+        });
+        if (data.alimento_id) {
+            row.dataset.foodId = data.alimento_id;
+            row.dataset.foodCategory = data.categoria || "";
+            row.dataset.portion = data.porcao || "";
+        }
         row.append(
-            inputGroup("Alimento", foodName),
-            inputGroup("Quantidade", quantity),
-            inputGroup("Medida", measure),
+            inputGroup("Alimento (busca no catálogo ou entrada manual)", foodName),
+            searchPanel,
+            inputGroup("Porção do catálogo", portions),
+            inputGroup("Quantidade (em gramas para alimentos USDA)", quantity),
+            inputGroup("Medida (seleções USDA usam gramas)", measure),
             inputGroup("Calorias (kcal)", calories),
+            nutritionSummary,
         );
+        if (data.alimento_id) {
+            api.obterAlimento(data.alimento_id).then((food) => {
+                if (row.isConnected) selectCatalogFood(row, food, data);
+            }).catch((error) => {
+                if (row.isConnected) {
+                    searchStatus.textContent =
+                        `Não foi possível recuperar o alimento salvo: ${error.message}`;
+                }
+            });
+        }
         const remove = createElement("button", "btn btn--ghost", "Remover opção");
         remove.type = "button";
         remove.addEventListener("click", () => {
@@ -242,12 +497,27 @@ function collectMeals(container) {
     return [...container.querySelectorAll(".meal-editor")].map((card) => ({
         horario: card.querySelector('[name="horario"]').value,
         nome: card.querySelector('[name="nome"]').value,
-        opcoes: [...card.querySelectorAll(".food-option-row")].map((row) => ({
-            nome: row.querySelector('[name="alimento"]').value,
-            quantidade: Number(row.querySelector('[name="quantidade"]').value),
-            medida: row.querySelector('[name="medida"]').value,
-            calorias: Number(row.querySelector('[name="calorias"]').value),
-        })),
+        opcoes: [...card.querySelectorAll(".food-option-row")].map((row) => {
+            const option = {
+                nome: row.querySelector('[name="alimento"]').value,
+                quantidade: Number(row.querySelector('[name="quantidade"]').value),
+                medida: row.querySelector('[name="medida"]').value,
+                calorias: Number(row.querySelector('[name="calorias"]').value),
+            };
+            if (row.dataset.foodId) {
+                option.alimento_id = row.dataset.foodId;
+                option.categoria = row.dataset.foodCategory;
+                option.porcao = row.dataset.portion;
+                option.energia_kcal = row.dataset.energiaKcal
+                    ? Number(row.dataset.energiaKcal)
+                    : null;
+                ["proteina_g", "carboidrato_g", "gordura_g", "fibra_g", "sodio_mg"]
+                    .forEach((key) => {
+                        option[key] = row.dataset[key] ? Number(row.dataset[key]) : null;
+                    });
+            }
+            return option;
+        }),
     }));
 }
 
@@ -286,10 +556,13 @@ function renderPlans(plans) {
             );
             const options = document.createElement("ul");
             meal.opcoes.forEach((option) => {
+                const nutrition = option.alimento_id
+                    ? ` · Proteína ${nutrientText(option.proteina_g, "g")}, carboidratos ${nutrientText(option.carboidrato_g, "g")}, gorduras ${nutrientText(option.gordura_g, "g")}`
+                    : "";
                 options.append(createElement(
                     "li",
                     "",
-                    `${option.nome} — ${option.quantidade} ${option.medida} · ${option.calorias} kcal`,
+                    `${option.nome} — ${option.quantidade} ${option.medida} · ${option.calorias} kcal${nutrition}`,
                 ));
             });
             section.append(options);

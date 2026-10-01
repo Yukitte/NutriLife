@@ -21,9 +21,10 @@ O NutriLife centraliza o acompanhamento nutricional: pacientes encontram profiss
 
 | Camada | Tecnologia |
 | :--- | :--- |
-| **Frontend** | JavaScript, HTML5, CSS3 |
-| **Backend** | Python |
-| **Banco de Dados** | MongoDB (NoSQL) |
+| **Frontend** | JavaScript vanilla, HTML5, CSS3 |
+| **Backend** | Python, FastAPI, Pydantic |
+| **Banco de Dados** | MongoDB com PyMongo |
+| **Testes** | Pytest, FastAPI TestClient |
 | **Hospedagem** | Netlify |
 | **Pagamentos** | Link PagSeguro com conferência manual |
 
@@ -135,10 +136,42 @@ conta existente, redefina sua senha localmente com `python reset_password.py`
 * Busca pública de nutricionistas por estado e perfis profissionais.
 * Disponibilidade semanal, reserva de horário, link PagSeguro e confirmação manual com link do Teams.
 * Consultas, pacientes e planos alimentares em páginas separadas.
-* Planos com objetivo, duração e refeições compostas por alimentos, quantidades, medidas e calorias.
+* Planos com objetivo, duração e refeições compostas por alimentos, quantidades, medidas, calorias e nutrientes.
+* Busca por alimento e categoria no catálogo TACO em português, com porções e cálculo nutricional por gramas; o USDA FoodData Central é mantido como alternativa.
 * E-mails únicos no MongoDB, CORS configurável por ambiente e acesso aos pacientes limitado a relações existentes.
 
 **Ainda fora do MVP:** integração automática/webhook PagSeguro, chat, avaliações/comentários, assinaturas e busca por distância. O fluxo de recuperação de senha exige SMTP configurado.
+
+### Catálogo de alimentos
+
+O projeto inclui a Tabela Brasileira de Composição de Alimentos (TACO), com
+nomes de alimentos e categorias em português. A publicação oficial permite
+reprodução total ou parcial desde que citada a fonte. Para recriar o catálogo
+derivado, baixe a planilha Excel oficial pelo NEPA/UNICAMP e execute de `backend/`:
+
+```powershell
+Invoke-WebRequest `
+  -Uri "https://www.nepa.unicamp.br/wp-content/uploads/sites/27/2023/10/Taco-4a-Edicao.xlsx" `
+  -OutFile "data/taco_4a_edicao.xlsx"
+python scripts/build_taco_catalog.py data/taco_4a_edicao.xlsx
+```
+
+O JSON convertido `data/taco_catalogo.json` pode ser versionado com a atribuição
+da fonte. A planilha original `data/taco_4a_edicao.xlsx` permanece ignorada pelo
+Git; o conversor reproduz o JSON a partir dela. Se o catálogo TACO não estiver
+presente, a busca usa o catálogo alternativo USDA incluído no repositório.
+
+A busca é servida por `GET /alimentos`, `GET /alimentos/categorias` e
+`GET /alimentos/fonte`. A TACO apresenta a composição por 100 g de parte
+comestível; a seleção local permite informar gramas. Ao salvar um plano, o
+backend valida o ID do catálogo ativo e recalcula calorias e nutrientes antes
+de gravar a refeição no MongoDB. Valores TACO `Tr`, `NA` e `*` ficam como não
+informados, não são interpretados como zero.
+
+Fonte: NEPA/UNICAMP. *Tabela Brasileira de Composição de Alimentos (TACO)*,
+4ª edição revisada e ampliada. Campinas: NEPA/UNICAMP. A publicação oficial
+declara: “É permitida a reprodução total ou parcial do material, desde que seja
+citada a fonte.” Consulte a [publicação oficial](https://nepa.unicamp.br/publicacoes/tabela-taco-pdf/).
 
 ### Publicação
 

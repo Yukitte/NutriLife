@@ -1,13 +1,25 @@
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from catalogo_alimentos import buscar_alimento_por_id, carregar_fonte
 
 
 class OpcaoAlimento(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    nome: str = Field(min_length=2, max_length=120)
+    nome: str = Field(min_length=2, max_length=250)
     quantidade: float = Field(gt=0, le=10000)
     medida: str = Field(min_length=1, max_length=40)
-    calorias: int = Field(ge=0, le=10000)
+    calorias: int = Field(ge=0, le=100000)
+    alimento_id: str | None = Field(default=None, min_length=1, max_length=24)
+    categoria: str | None = Field(default=None, max_length=120)
+    porcao: str | None = Field(default=None, max_length=250)
+    fonte_dados: str | None = Field(default=None, max_length=120)
+    energia_kcal: float | None = Field(default=None, ge=0, le=100000)
+    proteina_g: float | None = Field(default=None, ge=0, le=10000)
+    carboidrato_g: float | None = Field(default=None, ge=0, le=10000)
+    gordura_g: float | None = Field(default=None, ge=0, le=10000)
+    fibra_g: float | None = Field(default=None, ge=0, le=10000)
+    sodio_mg: float | None = Field(default=None, ge=0, le=1000000)
 
     @field_validator("nome", "medida")
     @classmethod
@@ -16,6 +28,40 @@ class OpcaoAlimento(BaseModel):
         if not value:
             raise ValueError("Este campo não pode ficar vazio.")
         return value
+
+    @model_validator(mode="after")
+    def preencher_dados_da_fonte(self):
+        if not self.alimento_id:
+            return self
+
+        food = buscar_alimento_por_id(self.alimento_id)
+        if food is None:
+            raise ValueError("Alimento não encontrado no catálogo ativo.")
+        if self.medida.casefold() not in {"g", "grama", "gramas"}:
+            raise ValueError("Alimentos do catálogo devem ser informados em gramas.")
+
+        per_100g = food["nutrients_per_100g"]
+        factor = self.quantidade / 100
+        energy = per_100g.get("energia_kcal")
+        if energy is None:
+            raise ValueError("O catálogo não informa energia para este alimento.")
+
+        self.nome = food["name"]
+        self.medida = "g"
+        self.categoria = food["category"]
+        self.fonte_dados = carregar_fonte()["name"]
+        self.calorias = round(energy * factor)
+        self.energia_kcal = energy * factor
+        for field in (
+            "proteina_g",
+            "carboidrato_g",
+            "gordura_g",
+            "fibra_g",
+            "sodio_mg",
+        ):
+            value = per_100g.get(field)
+            setattr(self, field, value * factor if value is not None else None)
+        return self
 
 
 class RefeicaoPlano(BaseModel):

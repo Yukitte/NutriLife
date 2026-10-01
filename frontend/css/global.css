@@ -991,6 +991,73 @@ button.calendar-day {
     border-radius: 12px;
 }
 
+.food-catalog-search,
+.food-nutrition-summary {
+    grid-column: 1 / -1;
+}
+
+.food-catalog-search {
+    display: grid;
+    gap: 8px;
+}
+
+.food-search-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.food-search-controls .input-group {
+    display: grid;
+    gap: 8px;
+}
+
+.food-search-controls label {
+    font-size: 0.82rem;
+    color: var(--secondary);
+    font-weight: 600;
+}
+
+.food-search-controls select,
+.food-portion-select {
+    width: 100%;
+    min-height: 46px;
+    padding: 10px 12px;
+    border: 1px solid var(--gray-light);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--primary);
+    font: inherit;
+}
+
+.food-search-results {
+    display: grid;
+    gap: 6px;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.food-result {
+    padding: 10px 12px;
+    border: 1px solid var(--gray-light);
+    border-radius: 9px;
+    background: #fff;
+    color: var(--primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.food-result:hover,
+.food-result:focus-visible {
+    border-color: var(--primary);
+    outline: 2px solid rgba(21, 91, 54, .12);
+}
+
+.food-nutrition-summary {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
 .plan-meals {
     display: grid;
     gap: 12px;
