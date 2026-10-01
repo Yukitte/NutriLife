@@ -27,6 +27,11 @@
             </section>
 
             <section class="auth-panel">
+                <a class="auth-brand" href="../../index.html" aria-label="NutriLife - página inicial">
+                    <img src="../../assets/images/NutriLife-logo-semfundo.png" alt="NutriLife">
+                </a>
+                <h1 class="auth-title">Acesse sua conta</h1>
+                <p class="auth-intro">Entre para acompanhar sua jornada nutricional.</p>
                 <div class="auth-header">
                     <div class="auth-tabs" role="tablist" aria-label="Autenticação do NutriLife">
                         <button type="button" class="auth-tab is-active" data-auth-tab="login" aria-selected="true">Entrar</button>
@@ -45,7 +50,8 @@
                         <input id="login-password" name="senha" type="password" placeholder="Sua senha" autocomplete="current-password" required>
                     </div>
 
-                    <button type="submit" class="btn btn--primary">Entrar</button>
+                    <a class="auth-forgot" href="./recuperar-senha.html">Esqueci minha senha</a>
+                    <button type="submit" class="btn btn--primary">Entrar na conta</button>
                     <p class="auth-status" aria-live="polite"></p>
                 </form>
 
@@ -61,15 +67,57 @@
                     </div>
 
                     <div class="input-group">
+                        <label for="register-phone">Telefone com DDD</label>
+                        <input id="register-phone" name="telefone" type="tel" autocomplete="tel" required>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="register-address">Endereço</label>
+                        <input id="register-address" name="endereco" autocomplete="street-address" required>
+                    </div>
+
+                    <div class="registration-location">
+                        <div class="input-group">
+                            <label for="register-cep">CEP</label>
+                            <input id="register-cep" name="cep" inputmode="numeric" autocomplete="postal-code" minlength="8" maxlength="9" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="register-state">Estado (UF)</label>
+                            <select id="register-state" name="estado" required>
+                                <option value="">Selecione</option>
+                                <option>AC</option><option>AL</option><option>AP</option><option>AM</option><option>BA</option>
+                                <option>CE</option><option>DF</option><option>ES</option><option>GO</option><option>MA</option>
+                                <option>MT</option><option>MS</option><option>MG</option><option>PA</option><option>PB</option>
+                                <option>PR</option><option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+                                <option>RS</option><option>RO</option><option>RR</option><option>SC</option><option>SP</option>
+                                <option>SE</option><option>TO</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
                         <label for="register-password">Senha</label>
                         <input id="register-password" name="senha" type="password" placeholder="Crie uma senha (mínimo 8 caracteres)" autocomplete="new-password" minlength="8" maxlength="128" required>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="register-type">Tipo de conta</label>
+                        <select id="register-type" name="tipo" required>
+                            <option value="paciente">Paciente</option>
+                            <option value="nutricionista">Nutricionista</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group" id="register-crn-group" hidden>
+                        <label for="register-crn">CRN</label>
+                        <input id="register-crn" name="crn" minlength="4" maxlength="20">
                     </div>
 
                     <button type="submit" class="btn btn--primary">Criar conta</button>
                     <p class="auth-status" aria-live="polite"></p>
                 </form>
 
-                <p class="auth-meta">O cadastro público cria uma conta de paciente. Contas profissionais são provisionadas pela equipe.</p>
+                <p class="auth-meta">Nutricionistas informam o CRN no cadastro. O CRN informado não é verificado automaticamente.</p>
             </section>
         </div>
     </main>

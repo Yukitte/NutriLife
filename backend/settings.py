@@ -20,6 +20,13 @@ class Settings(BaseSettings):
         min_length=32,
     )
     access_token_expire_minutes: int = Field(default=30, ge=5, le=1440)
+    password_reset_expire_minutes: int = Field(default=15, ge=5, le=60)
+    frontend_base_url: str = "http://localhost:5500"
+    smtp_host: str = ""
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
 
     @property
     def allowed_origins(self) -> list[str]:

@@ -1,6 +1,7 @@
 from bson import ObjectId
 
 from database.connection import get_database
+from crud.usuario_crud import paciente_vinculado
 from schemas.plano_schema import PlanoCreate, PlanoUpdate
 
 
@@ -19,8 +20,22 @@ def _serializar_plano(plano: dict) -> dict:
             nutricionista["nome"] if nutricionista else "Nutricionista removido"
         ),
         "titulo": plano["titulo"],
+        "objetivo": plano.get("objetivo", ""),
+        "duracao_meses": plano.get("duracao_meses", 0),
         "descricao": plano["descricao"],
-        "refeicoes": plano["refeicoes"],
+        "refeicoes": [
+            refeicao if isinstance(refeicao, dict) else {
+                "horario": "00:00",
+                "nome": refeicao,
+                "opcoes": [{
+                    "nome": refeicao,
+                    "quantidade": 1,
+                    "medida": "porção",
+                    "calorias": 0,
+                }],
+            }
+            for refeicao in plano["refeicoes"]
+        ],
     }
 
 
@@ -34,13 +49,17 @@ def criar_plano(plano: PlanoCreate, nutricionista: dict) -> dict | None:
     )
     if paciente is None:
         return None
+    if not paciente_vinculado(nutricionista["id"], plano.paciente_id):
+        return None
 
     document = {
         "paciente_id": paciente_id,
         "nutricionista_id": ObjectId(nutricionista["id"]),
         "titulo": plano.titulo.strip(),
+        "objetivo": plano.objetivo.strip(),
+        "duracao_meses": plano.duracao_meses,
         "descricao": plano.descricao.strip(),
-        "refeicoes": [refeicao.strip() for refeicao in plano.refeicoes],
+        "refeicoes": [refeicao.model_dump() for refeicao in plano.refeicoes],
     }
     result = database["planos"].insert_one(document)
     return _serializar_plano({**document, "_id": result.inserted_id})
@@ -62,7 +81,9 @@ def atualizar_plano(plano_id: str, changes: PlanoUpdate, nutricionista: dict) ->
     if "descricao" in updates:
         updates["descricao"] = updates["descricao"].strip()
     if "refeicoes" in updates:
-        updates["refeicoes"] = [refeicao.strip() for refeicao in updates["refeicoes"]]
+        updates["refeicoes"] = [refeicao.model_dump() for refeicao in updates["refeicoes"]]
+    if "objetivo" in updates:
+        updates["objetivo"] = updates["objetivo"].strip()
 
     collection = get_database()["planos"]
     query = {

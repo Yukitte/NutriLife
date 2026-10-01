@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pacientes | NutriLife</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body data-page="patients">
+    <div class="dashboard-shell">
+        <aside class="dashboard-sidebar">
+            <div class="brand">
+                <a href="../index.html">
+                    <img src="../assets/images/NutriLife-logo-semfundo.png" alt="NutriLife" class="brand-logo">
+                </a>
+            </div>
+            <nav class="sidebar-nav" aria-label="Navegação do painel">
+                <a href="../dashboard.html" class="sidebar-link">Visão geral</a>
+                <a href="./planos.html" class="sidebar-link">Planos alimentares</a>
+                <a href="./pacientes.html" class="sidebar-link is-active" aria-current="page">Pacientes</a>
+            </nav>
+            <button id="logout-button" class="sidebar-logout" type="button">Sair</button>
+        </aside>
+
+        <main class="dashboard-main">
+            <header class="dashboard-header">
+                <div>
+                    <span class="eyebrow">Área profissional</span>
+                    <h1>Pacientes</h1>
+                    <p>Olá, <span id="user-name">Usuário</span>.</p>
+                </div>
+                <span class="btn btn--primary" id="user-role">Nutricionista</span>
+            </header>
+            <p id="dashboard-status" class="dashboard-status" role="alert" hidden></p>
+
+            <section class="dashboard-grid">
+                <article class="panel">
+                    <h3>Pacientes cadastrados</h3>
+                    <ul id="patients-list" class="list" aria-live="polite">
+                        <li>Carregando pacientes...</li>
+                    </ul>
+                </article>
+            </section>
+        </main>
+    </div>
+    <script src="../config.js" defer></script>
+    <script src="../js/api.js" defer></script>
+    <script src="../js/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agendamentos | NutriLife</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body data-page="appointments">
+    <div class="dashboard-shell">
+        <aside class="dashboard-sidebar">
+            <a class="brand" href="../index.html"><img src="../assets/images/NutriLife-logo-semfundo.png" alt="NutriLife" class="brand-logo"></a>
+            <nav class="sidebar-nav" aria-label="Navegação do painel">
+                <a href="../dashboard.html" class="sidebar-link">Início</a>
+                <a href="./busca.html" class="sidebar-link" id="search-nav">Buscar nutricionista</a>
+                <a href="./planos.html" class="sidebar-link">Planos alimentares</a>
+                <a href="./consultas.html" class="sidebar-link is-active" aria-current="page">Agendamentos</a>
+                <a href="./agenda-profissional.html" class="sidebar-link" id="calendar-nav">Disponibilidade</a>
+            </nav>
+            <button id="logout-button" class="sidebar-logout" type="button">Sair</button>
+        </aside>
+        <main class="dashboard-main">
+            <header class="dashboard-header"><div><span class="eyebrow">Agenda</span><h1>Meus agendamentos</h1></div></header>
+            <p id="dashboard-status" class="dashboard-status" role="alert" hidden></p>
+            <section id="appointments-list" class="appointment-list" aria-live="polite"><p>Carregando consultas...</p></section>
+        </main>
+    </div>
+    <script src="../config.js" defer></script><script src="../js/api.js" defer></script><script src="../js/app.js" defer></script>
+</body>
+</html>

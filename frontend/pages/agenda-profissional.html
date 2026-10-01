@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disponibilidade profissional | NutriLife</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body data-page="professional-calendar">
+    <div class="dashboard-shell">
+        <aside class="dashboard-sidebar">
+            <a class="brand" href="../index.html"><img src="../assets/images/NutriLife-logo-semfundo.png" alt="NutriLife" class="brand-logo"></a>
+            <nav class="sidebar-nav" aria-label="Navegação do painel">
+                <a href="../dashboard.html" class="sidebar-link">Início</a>
+                <a href="./pacientes.html" class="sidebar-link">Pacientes</a>
+                <a href="./consultas.html" class="sidebar-link">Agendamentos</a>
+                <a href="./agenda-profissional.html" class="sidebar-link is-active" aria-current="page">Disponibilidade</a>
+            </nav>
+            <button id="logout-button" class="sidebar-logout" type="button">Sair</button>
+        </aside>
+        <main class="dashboard-main">
+            <header class="dashboard-header">
+                <div>
+                    <span class="eyebrow">Agenda profissional</span>
+                    <h1>Disponibilidade</h1>
+                    <p>Configure seus horários recorrentes e confira como aparecem no calendário.</p>
+                </div>
+            </header>
+            <p id="dashboard-status" class="dashboard-status" role="alert" hidden></p>
+            <section class="professional-availability-grid">
+                <article class="panel availability-calendar-panel">
+                    <header class="availability-calendar-header">
+                        <h2>Agenda mensal</h2>
+                        <div class="calendar-controls">
+                            <button id="availability-previous-month" class="btn btn--ghost" type="button" aria-label="Mês anterior">‹</button>
+                            <strong id="availability-calendar-month"></strong>
+                            <button id="availability-next-month" class="btn btn--ghost" type="button" aria-label="Próximo mês">›</button>
+                        </div>
+                    </header>
+                    <div class="calendar-weekdays" aria-hidden="true">
+                        <span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span>
+                    </div>
+                    <div id="professional-availability-calendar" class="availability-calendar" aria-label="Prévia mensal dos horários recorrentes"></div>
+                    <div class="availability-legend">
+                        <span><i class="availability-legend__swatch"></i> Dia com horário configurado</span>
+                    </div>
+                </article>
+                <article class="panel availability-editor-panel">
+                    <h2 id="availability-selected-date">Horários do dia</h2>
+                    <div id="availability-day-schedule" class="availability-day-schedule" aria-live="polite"></div>
+                    <form id="availability-form" class="dashboard-form">
+                        <h3>Editar disponibilidade semanal</h3>
+                        <div class="input-group">
+                            <label for="timezone">Fuso horário</label>
+                            <select id="timezone" name="fuso_horario">
+                                <option value="America/Sao_Paulo">Brasília (America/Sao_Paulo)</option>
+                                <option value="America/Manaus">Manaus</option>
+                                <option value="America/Rio_Branco">Rio Branco</option>
+                                <option value="America/Noronha">Fernando de Noronha</option>
+                            </select>
+                        </div>
+                        <div id="weekday-schedules" class="weekday-schedules"></div>
+                        <button class="btn btn--primary" type="submit">Salvar disponibilidade</button>
+                    </form>
+                </article>
+            </section>
+        </main>
+    </div>
+    <script src="../config.js" defer></script><script src="../js/api.js" defer></script><script src="../js/app.js" defer></script>
+</body>
+</html>

@@ -4,13 +4,17 @@ from pymongo.errors import DuplicateKeyError
 from crud.usuario_crud import (
     atualizar_usuario,
     buscar_usuario,
+    buscar_nutricionista,
     criar_usuario,
+    listar_nutricionistas,
     listar_pacientes,
+    paciente_vinculado,
     remover_usuario,
 )
 from schemas.usuario_schema import (
     TokenResponse,
     UsuarioCreate,
+    UsuarioPublico,
     UsuarioResponse,
     UsuarioUpdate,
 )
@@ -32,8 +36,8 @@ def cadastrar_usuario(usuario: UsuarioCreate):
 
 
 @router.get("", response_model=list[UsuarioResponse])
-def consultar_pacientes(_: dict = Depends(require_nutritionist)):
-    return listar_pacientes()
+def consultar_pacientes(nutricionista: dict = Depends(require_nutritionist)):
+    return listar_pacientes(nutricionista["id"])
 
 
 @router.get("/me", response_model=UsuarioResponse)
@@ -46,6 +50,21 @@ def atualizar_perfil(
     changes: UsuarioUpdate,
     usuario: dict = Depends(get_current_user),
 ):
+    professional_fields = {
+        "crn",
+        "especialidades",
+        "biografia",
+        "valor_consulta",
+        "pagseguro_link",
+    }
+    changes_requested = changes.model_dump(exclude_unset=True)
+    if usuario["perfil"] != "nutricionista" and professional_fields.intersection(
+        changes_requested
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Somente nutricionistas podem editar dados profissionais.",
+        )
     try:
         updated = atualizar_usuario(usuario["id"], changes)
     except DuplicateKeyError as error:
@@ -53,6 +72,21 @@ def atualizar_perfil(
     if updated is None:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
     return updated
+
+
+@router.get("/nutricionistas", response_model=list[UsuarioPublico])
+def consultar_nutricionistas(estado: str | None = None):
+    if estado and len(estado.strip()) != 2:
+        raise HTTPException(status_code=422, detail="Informe a sigla de um estado.")
+    return listar_nutricionistas(estado.strip() if estado else None)
+
+
+@router.get("/nutricionistas/{usuario_id}", response_model=UsuarioPublico)
+def consultar_perfil_publico(usuario_id: str):
+    professional = buscar_nutricionista(usuario_id)
+    if professional is None:
+        raise HTTPException(status_code=404, detail="Nutricionista não encontrado.")
+    return professional
 
 
 @router.get("/{usuario_id}", response_model=UsuarioResponse)
@@ -67,6 +101,11 @@ def consultar_usuario(
         usuario["perfil"] == "nutricionista" and found["perfil"] != "paciente"
     ):
         raise HTTPException(status_code=404, detail="Paciente não encontrado.")
+    if usuario["perfil"] == "nutricionista" and not paciente_vinculado(
+        usuario["id"],
+        usuario_id,
+    ):
+        raise HTTPException(status_code=404, detail="Paciente não vinculado.")
     return found
 
 

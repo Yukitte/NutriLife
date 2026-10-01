@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agendar consulta | NutriLife</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body data-page="booking">
+    <div class="dashboard-shell">
+        <aside class="dashboard-sidebar">
+            <a class="brand" href="../index.html"><img src="../assets/images/NutriLife-logo-semfundo.png" alt="NutriLife" class="brand-logo"></a>
+            <nav class="sidebar-nav" aria-label="Navegação do painel">
+                <a href="../dashboard.html" class="sidebar-link">Início</a>
+                <a href="./busca.html" class="sidebar-link">Buscar nutricionista</a>
+                <a href="./consultas.html" class="sidebar-link">Meus agendamentos</a>
+            </nav>
+            <button id="logout-button" class="sidebar-logout" type="button">Sair</button>
+        </aside>
+        <main class="dashboard-main">
+            <header class="dashboard-header">
+                <div><span class="eyebrow">Agendamento</span><h1>Escolha um horário</h1><p id="booking-professional"></p></div>
+                <div class="calendar-controls">
+                    <button id="previous-month" class="btn btn--ghost" type="button" aria-label="Mês anterior">‹</button>
+                    <strong id="calendar-month"></strong>
+                    <button id="next-month" class="btn btn--ghost" type="button" aria-label="Próximo mês">›</button>
+                </div>
+            </header>
+            <p id="dashboard-status" class="dashboard-status" role="alert" hidden></p>
+            <section class="calendar-layout">
+                <div class="panel">
+                    <div class="calendar-weekdays"><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span></div>
+                    <div id="availability-calendar" class="availability-calendar" aria-live="polite"></div>
+                </div>
+                <div class="panel">
+                    <h3 id="selected-date-title">Selecione um dia</h3>
+                    <div id="available-slots" class="slot-list"></div>
+                    <p class="item-meta">A reserva fica pendente até a nutricionista confirmar o pagamento. O link PagSeguro será exibido após reservar.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="../config.js" defer></script><script src="../js/api.js" defer></script><script src="../js/app.js" defer></script>
+</body>
+</html>

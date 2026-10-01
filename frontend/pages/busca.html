@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscar nutricionista | NutriLife</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body data-page="search">
+    <div class="dashboard-shell">
+        <aside class="dashboard-sidebar">
+            <a class="brand" href="../index.html"><img src="../assets/images/NutriLife-logo-semfundo.png" alt="NutriLife" class="brand-logo"></a>
+            <nav class="sidebar-nav" aria-label="Navegação do painel">
+                <a href="../dashboard.html" class="sidebar-link">Início</a>
+                <a href="./busca.html" class="sidebar-link is-active" aria-current="page">Buscar nutricionista</a>
+                <a href="./planos.html" class="sidebar-link">Planos alimentares</a>
+                <a href="./consultas.html" class="sidebar-link">Meus agendamentos</a>
+            </nav>
+            <button id="logout-button" class="sidebar-logout" type="button">Sair</button>
+        </aside>
+        <main class="dashboard-main">
+            <header class="dashboard-header">
+                <div><span class="eyebrow" id="today-date"></span><h1>Olá, <span id="user-name">Paciente</span></h1><p>Encontre um profissional para acompanhar você.</p></div>
+            </header>
+            <p id="dashboard-status" class="dashboard-status" role="alert" hidden></p>
+            <section class="panel">
+                <form id="search-form" class="dashboard-form search-filters">
+                    <div class="input-group">
+                        <label for="state-filter">Estado</label>
+                        <select id="state-filter" name="estado">
+                            <option value="">Todos os estados</option>
+                            <option>AC</option><option>AL</option><option>AP</option><option>AM</option><option>BA</option>
+                            <option>CE</option><option>DF</option><option>ES</option><option>GO</option><option>MA</option>
+                            <option>MT</option><option>MS</option><option>MG</option><option>PA</option><option>PB</option>
+                            <option>PR</option><option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+                            <option>RS</option><option>RO</option><option>RR</option><option>SC</option><option>SP</option>
+                            <option>SE</option><option>TO</option>
+                        </select>
+                    </div>
+                    <p class="item-meta">A busca por distância será adicionada quando houver geolocalização com consentimento.</p>
+                    <button class="btn btn--primary" type="submit">Buscar</button>
+                </form>
+            </section>
+            <section class="directory-grid" id="nutritionists-list" aria-live="polite"></section>
+        </main>
+    </div>
+    <script src="../config.js" defer></script><script src="../js/api.js" defer></script><script src="../js/app.js" defer></script>
+</body>
+</html>

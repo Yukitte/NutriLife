@@ -19,9 +19,13 @@
             </div>
 
             <nav class="sidebar-nav" aria-label="Navegação do painel">
-                <a href="#resumo" class="sidebar-link is-active">Visão geral</a>
-                <a href="#planos" class="sidebar-link">Planos alimentares</a>
-                <a href="#patients-panel" class="sidebar-link">Pacientes</a>
+                <a href="./dashboard.html" class="sidebar-link is-active">Visão geral</a>
+                <a href="./pages/planos.html" class="sidebar-link">Planos alimentares</a>
+                <a id="patients-nav" href="./pages/pacientes.html" class="sidebar-link">Pacientes</a>
+                <a id="search-nav" href="./pages/busca.html" class="sidebar-link">Buscar nutricionista</a>
+                <a href="./pages/consultas.html" class="sidebar-link">Agendamentos</a>
+                <a id="availability-nav" href="./pages/agenda-profissional.html" class="sidebar-link">Disponibilidade</a>
+                <a id="profile-nav" href="./pages/perfil-profissional.html" class="sidebar-link">Meu perfil profissional</a>
             </nav>
 
             <button id="logout-button" class="sidebar-logout" type="button">Sair</button>
@@ -43,44 +47,20 @@
                     <span class="kpi-card__label">Planos alimentares</span>
                     <div id="plans-count" class="kpi-card__value">—</div>
                 </article>
+                <article class="kpi-card" id="patients-count-card" hidden>
+                    <span class="kpi-card__label">Pacientes cadastrados</span>
+                    <div id="patients-count" class="kpi-card__value">—</div>
+                </article>
             </section>
 
             <section class="dashboard-grid">
-                <article id="planos" class="panel">
-                    <h3>Planos alimentares</h3>
-                    <div id="plans-list" class="plans-list" aria-live="polite">
-                        <p class="item-meta">Carregando planos...</p>
-                    </div>
-                </article>
-
-                <article id="create-plan-panel" class="panel" hidden>
-                    <h3>Criar plano alimentar</h3>
-                    <form id="create-plan-form" class="dashboard-form">
-                        <div class="input-group">
-                            <label for="plan-patient">Paciente</label>
-                            <select id="plan-patient" name="paciente_id" required>
-                                <option value="">Carregando pacientes...</option>
-                            </select>
-                        </div>
-                        <div class="input-group">
-                            <label for="plan-title">Título</label>
-                            <input id="plan-title" name="titulo" minlength="3" maxlength="120" required>
-                        </div>
-                        <div class="input-group">
-                            <label for="plan-description">Orientações</label>
-                            <textarea id="plan-description" name="descricao" maxlength="1000" required></textarea>
-                        </div>
-                        <div class="input-group">
-                            <label for="plan-meals">Refeições (uma por linha)</label>
-                            <textarea id="plan-meals" name="refeicoes" required></textarea>
-                        </div>
-                        <button type="submit" class="btn btn--primary">Salvar plano</button>
-                    </form>
-                </article>
-
-                <article id="patients-panel" class="panel" hidden>
-                    <h3>Pacientes cadastrados</h3>
-                    <ul id="patients-list" class="list"></ul>
+                <article class="panel">
+                    <h3>Acompanhamento nutricional</h3>
+                    <p>Consulte seus planos alimentares ou, se você é nutricionista, gerencie seus pacientes e os planos deles.</p>
+                    <p class="dashboard-actions">
+                        <a class="btn btn--primary" href="./pages/planos.html">Abrir planos alimentares</a>
+                        <a id="patients-action" class="btn btn--ghost" href="./pages/pacientes.html">Ver pacientes</a>
+                    </p>
                 </article>
             </section>
         </main>

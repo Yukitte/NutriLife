@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editar perfil profissional | NutriLife</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body data-page="professional-profile-edit">
+    <div class="dashboard-shell">
+        <aside class="dashboard-sidebar">
+            <a class="brand" href="../index.html"><img src="../assets/images/NutriLife-logo-semfundo.png" alt="NutriLife" class="brand-logo"></a>
+            <nav class="sidebar-nav" aria-label="Navegação do painel">
+                <a href="../dashboard.html" class="sidebar-link">Início</a>
+                <a href="./busca.html" class="sidebar-link">Ver perfil público</a>
+                <a href="./pacientes.html" class="sidebar-link">Pacientes</a>
+                <a href="./agenda-profissional.html" class="sidebar-link">Disponibilidade</a>
+            </nav>
+            <button id="logout-button" class="sidebar-logout" type="button">Sair</button>
+        </aside>
+        <main class="dashboard-main">
+            <header class="dashboard-header"><div><span class="eyebrow">Perfil público</span><h1>Editar perfil profissional</h1></div></header>
+            <p id="dashboard-status" class="dashboard-status" role="alert" hidden></p>
+            <article class="panel">
+                <form id="professional-profile-form" class="dashboard-form">
+                    <div class="input-group"><label for="professional-phone">Telefone/WhatsApp</label><input id="professional-phone" name="telefone" type="tel" required></div>
+                    <div class="input-group"><label for="professional-address">Endereço</label><input id="professional-address" name="endereco" required></div>
+                    <div class="profile-fields">
+                        <div class="input-group"><label for="professional-cep">CEP</label><input id="professional-cep" name="cep" required></div>
+                        <div class="input-group"><label for="professional-state">Estado (UF)</label><input id="professional-state" name="estado" minlength="2" maxlength="2" required></div>
+                    </div>
+                    <div class="input-group"><label for="specialties">Especialidades (separadas por vírgula)</label><input id="specialties" name="especialidades"></div>
+                    <div class="input-group"><label for="biography">Biografia profissional</label><textarea id="biography" name="biografia" maxlength="2000"></textarea></div>
+                    <div class="input-group"><label for="consult-price">Valor da consulta</label><input id="consult-price" name="valor_consulta" type="number" min="0" step="0.01" required></div>
+                    <div class="input-group"><label for="pagseguro-link">Link de checkout PagSeguro</label><input id="pagseguro-link" name="pagseguro_link" type="url" placeholder="https://"></div>
+                    <p class="item-meta">O link PagSeguro será apresentado ao paciente quando reservar um horário; a confirmação do pagamento é manual.</p>
+                    <button class="btn btn--primary" type="submit">Salvar perfil</button>
+                </form>
+            </article>
+        </main>
+    </div>
+    <script src="../config.js" defer></script><script src="../js/api.js" defer></script><script src="../js/app.js" defer></script>
+</body>
+</html>

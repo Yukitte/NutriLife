@@ -4,9 +4,17 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 import main
+from crud.usuario_crud import _serializar_profissional
 from routers import auth_router, usuario_router
-from schemas.usuario_schema import UsuarioUpdate
-from security import create_access_token, hash_password, verify_password
+from schemas.consulta_schema import DisponibilidadeUpdate
+from schemas.usuario_schema import UsuarioCreate, UsuarioUpdate
+from security import (
+    create_access_token,
+    create_password_reset_token,
+    get_reset_token_claims,
+    hash_password,
+    verify_password,
+)
 from settings import Settings, get_settings
 
 
@@ -20,13 +28,18 @@ def client(monkeypatch):
 def test_register_creates_patient_and_never_returns_password(client, monkeypatch):
     created_users = []
 
-    def create_user(usuario, senha_hash, perfil="paciente"):
-        created_users.append((usuario, senha_hash, perfil))
+    def create_user(usuario, senha_hash):
+        created_users.append((usuario, senha_hash))
         return {
             "id": "507f1f77bcf86cd799439011",
             "nome": usuario.nome,
             "email": str(usuario.email),
-            "perfil": perfil,
+            "perfil": usuario.tipo,
+            "telefone": usuario.telefone,
+            "endereco": usuario.endereco,
+            "cep": usuario.cep,
+            "estado": usuario.estado,
+            "data_inicio": "2026-10-01",
         }
 
     monkeypatch.setattr(usuario_router, "criar_usuario", create_user)
@@ -38,14 +51,19 @@ def test_register_creates_patient_and_never_returns_password(client, monkeypatch
         json={
             "nome": "Maria Souza",
             "email": "maria@example.com",
+            "telefone": "61988887777",
+            "endereco": "Rua das Flores, 10",
+            "cep": "70000000",
+            "estado": "DF",
             "senha": "senha-segura-123",
+            "tipo": "paciente",
         },
     )
 
     assert response.status_code == 201
     assert response.json()["usuario"]["perfil"] == "paciente"
     assert "senha" not in response.json()["usuario"]
-    assert created_users[0][1:] == ("hashed", "paciente")
+    assert created_users[0][1] == "hashed"
 
 
 def test_public_registration_cannot_choose_role(client):
@@ -54,12 +72,57 @@ def test_public_registration_cannot_choose_role(client):
         json={
             "nome": "Maria Souza",
             "email": "maria@example.com",
+            "telefone": "61988887777",
+            "endereco": "Rua das Flores, 10",
+            "cep": "70000000",
+            "estado": "DF",
             "senha": "senha-segura-123",
-            "perfil": "nutricionista",
+            "tipo": "nutricionista",
         },
     )
 
     assert response.status_code == 422
+
+
+def test_public_nutritionist_directory_does_not_expose_email(client, monkeypatch):
+    monkeypatch.setattr(
+        usuario_router,
+        "listar_nutricionistas",
+        lambda _: [{
+            "id": "507f1f77bcf86cd799439011",
+            "nome": "Ana Nutri",
+            "estado": "DF",
+            "crn": "12345",
+            "telefone": "61988887777",
+            "especialidades": ["Emagrecimento"],
+            "biografia": "Atendimento nutricional",
+            "valor_consulta": 150,
+            "nota_media": 0,
+            "total_pacientes": 0,
+            "data_inicio": "2026-10-01",
+        }],
+    )
+    response = client.get("/usuarios/nutricionistas?estado=DF")
+
+    assert response.status_code == 200
+    assert response.json()[0]["nome"] == "Ana Nutri"
+    assert "email" not in response.json()[0]
+
+
+def test_public_professional_serializer_omits_private_account_fields():
+    professional = _serializar_profissional({
+        "_id": "507f1f77bcf86cd799439011",
+        "nome": "Ana Nutri",
+        "email": "private@example.com",
+        "endereco": "Rua privada, 10",
+        "cep": "70000000",
+        "pagseguro_link": "https://pag.ae/example",
+    })
+
+    assert professional["nome"] == "Ana Nutri"
+    assert "email" not in professional
+    assert "endereco" not in professional
+    assert "pagseguro_link" not in professional
 
 
 def test_login_returns_access_token_without_password_hash(client, monkeypatch):
@@ -93,6 +156,10 @@ def test_private_resources_require_authentication(client, path):
     assert response.status_code == 401
 
 
+def test_appointment_list_requires_authentication(client):
+    assert client.get("/consultas").status_code == 401
+
+
 def test_patient_cannot_create_plan(client, monkeypatch):
     monkeypatch.setattr(
         "security.buscar_usuario",
@@ -110,8 +177,19 @@ def test_patient_cannot_create_plan(client, monkeypatch):
         json={
             "paciente_id": "507f1f77bcf86cd799439012",
             "titulo": "Plano semanal",
+            "objetivo": "Melhorar hábitos",
+            "duracao_meses": 3,
             "descricao": "Orientações gerais",
-            "refeicoes": ["Café da manhã"],
+            "refeicoes": [{
+                "horario": "07:00",
+                "nome": "Café da manhã",
+                "opcoes": [{
+                    "nome": "Aveia",
+                    "quantidade": 1,
+                    "medida": "porção",
+                    "calorias": 150,
+                }],
+            }],
         },
     )
 
@@ -131,6 +209,46 @@ def test_passwords_are_hashed_and_access_tokens_expire():
     )
     assert claims["sub"] == "507f1f77bcf86cd799439011"
     assert "exp" in claims
+    assert claims["purpose"] == "access"
+
+
+def test_password_reset_token_has_separate_purpose_and_nonce():
+    token = create_password_reset_token(
+        "507f1f77bcf86cd799439011",
+        "one-time-nonce",
+    )
+    assert get_reset_token_claims(token) == {
+        "user_id": "507f1f77bcf86cd799439011",
+        "jti": "one-time-nonce",
+    }
+    assert get_reset_token_claims(
+        create_access_token("507f1f77bcf86cd799439011")
+    ) is None
+
+
+def test_availability_rejects_overlapping_windows():
+    with pytest.raises(ValidationError):
+        DisponibilidadeUpdate(
+            fuso_horario="America/Sao_Paulo",
+            horarios=[
+                {"dia_semana": 0, "inicio": "09:00", "fim": "12:00", "duracao_minutos": 60},
+                {"dia_semana": 0, "inicio": "11:00", "fim": "13:00", "duracao_minutos": 60},
+            ],
+        )
+
+
+def test_registration_requires_crn_for_nutritionist():
+    with pytest.raises(ValidationError):
+        UsuarioCreate(
+            nome="Ana Nutri",
+            email="ana@example.com",
+            telefone="61988887777",
+            endereco="Rua das Flores, 10",
+            cep="70000000",
+            estado="df",
+            senha="senha-segura-123",
+            tipo="nutricionista",
+        )
 
 
 def test_health_check_confirms_database_connection(client, monkeypatch):
@@ -159,3 +277,21 @@ def test_production_rejects_example_jwt_secret():
 def test_user_update_rejects_empty_name():
     with pytest.raises(ValidationError):
         UsuarioUpdate(nome="  ")
+
+
+def test_registration_rejects_unknown_state():
+    with pytest.raises(ValidationError):
+        UsuarioCreate(
+            nome="Maria Souza",
+            email="maria@example.com",
+            telefone="61988887777",
+            endereco="Rua das Flores, 10",
+            cep="70000000",
+            estado="ZZ",
+            senha="senha-segura-123",
+        )
+
+
+def test_payment_link_requires_https():
+    with pytest.raises(ValidationError):
+        UsuarioUpdate(pagseguro_link="http://pag.ae/example")

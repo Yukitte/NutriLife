@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planos alimentares | NutriLife</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body data-page="plans">
+    <div class="dashboard-shell">
+        <aside class="dashboard-sidebar">
+            <div class="brand">
+                <a href="../index.html">
+                    <img src="../assets/images/NutriLife-logo-semfundo.png" alt="NutriLife" class="brand-logo">
+                </a>
+            </div>
+            <nav class="sidebar-nav" aria-label="Navegação do painel">
+                <a href="../dashboard.html" class="sidebar-link">Visão geral</a>
+                <a href="./planos.html" class="sidebar-link is-active" aria-current="page">Planos alimentares</a>
+                <a id="patients-nav" href="./pacientes.html" class="sidebar-link">Pacientes</a>
+            </nav>
+            <button id="logout-button" class="sidebar-logout" type="button">Sair</button>
+        </aside>
+
+        <main class="dashboard-main">
+            <header class="dashboard-header">
+                <div>
+                    <span class="eyebrow">Acompanhamento nutricional</span>
+                    <h1>Planos alimentares</h1>
+                    <p>Olá, <span id="user-name">Usuário</span>.</p>
+                </div>
+                <span class="btn btn--primary" id="user-role">Paciente</span>
+            </header>
+            <p id="dashboard-status" class="dashboard-status" role="alert" hidden></p>
+
+            <section class="dashboard-grid">
+                <article class="panel">
+                    <h3>Seus planos</h3>
+                    <div id="plans-list" class="plans-list" aria-live="polite">
+                        <p class="item-meta">Carregando planos...</p>
+                    </div>
+                </article>
+
+                <article id="create-plan-panel" class="panel" hidden>
+                    <h3>Criar plano alimentar</h3>
+                    <form id="create-plan-form" class="dashboard-form">
+                        <div class="input-group">
+                            <label for="plan-patient">Paciente</label>
+                            <select id="plan-patient" name="paciente_id" required>
+                                <option value="">Carregando pacientes...</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="plan-title">Título</label>
+                            <input id="plan-title" name="titulo" minlength="3" maxlength="120" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="plan-objective">Objetivo</label>
+                            <input id="plan-objective" name="objetivo" maxlength="160" placeholder="Ex.: Emagrecimento" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="plan-duration">Duração (meses)</label>
+                            <input id="plan-duration" name="duracao_meses" type="number" min="1" max="60" value="6" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="plan-description">Orientações</label>
+                            <textarea id="plan-description" name="descricao" maxlength="1000" required></textarea>
+                        </div>
+                        <div id="meal-editor" class="meal-editor-list"></div>
+                        <button id="add-meal" class="btn btn--ghost" type="button">Adicionar refeição</button>
+                        <button type="submit" class="btn btn--primary">Salvar plano</button>
+                    </form>
+                </article>
+            </section>
+        </main>
+    </div>
+    <script src="../config.js" defer></script>
+    <script src="../js/api.js" defer></script>
+    <script src="../js/app.js" defer></script>
+</body>
+</html>

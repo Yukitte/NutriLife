@@ -1,19 +1,19 @@
 # NutriLife 🍎
 
-O **NutriLife** é uma plataforma web moderna projetada para nutricionistas e pacientes, focada em automatizar o agendamento de consultas, a gestão de planos alimentares e o processamento de pagamentos.
+O **NutriLife** é um MVP web para nutricionistas e pacientes, com cadastro, perfis profissionais, agendamento, confirmação manual de pagamento e gestão de planos alimentares.
 
 ---
 
 ## 🚀 Sobre o Projeto
 
-O NutriLife resolve o problema de tecnologias obsoletas e dificuldades de suporte em tempo real. A plataforma centraliza o acompanhamento nutricional, permitindo que o paciente tenha sua dieta na palma da mão e a nutricionista gerencie sua agenda com eficiência.
+O NutriLife centraliza o acompanhamento nutricional: pacientes encontram profissionais por estado, consultam horários disponíveis e acessam seus planos alimentares; nutricionistas gerenciam perfil, disponibilidade, consultas, pacientes e dietas.
 
 ### Principais Funcionalidades
-* **📅 Agendamento Inteligente:** Consulta de horários em tempo real e marcação online.
-* **💳 Pagamentos Integrados:** Sistema de checkout para planos nutricionais (estilo streaming/assinatura).
+* **📅 Agendamento:** Horários livres calculados pela disponibilidade semanal e fuso horário da nutricionista.
+* **💳 Pagamento manual:** A nutricionista informa seu link PagSeguro; após conferir o pagamento, confirma a consulta e registra o link do Teams.
 * **🥗 Plano Alimentar Digital:** Acesso prático às dietas personalizadas via navegador.
-* **💬 Suporte em Tempo Real:** Integração para dúvidas e ajustes rápidos entre nutricionista e cliente.
-* **👥 Gestão de Usuários:** Cadastro completo de pacientes com histórico de consultas.
+* **👥 Gestão de pacientes:** Acesso limitado a pacientes com consulta confirmada ou plano alimentar vinculado.
+* **🔐 Segurança básica:** Senhas com Argon2, JWT temporário e redefinição de senha por e-mail.
 
 ---
 
@@ -25,7 +25,7 @@ O NutriLife resolve o problema de tecnologias obsoletas e dificuldades de suport
 | **Backend** | Python |
 | **Banco de Dados** | MongoDB (NoSQL) |
 | **Hospedagem** | Netlify |
-| **Pagamentos** | Integração via APIs (ex: PagSeguro) |
+| **Pagamentos** | Link PagSeguro com conferência manual |
 
 ---
 
@@ -70,7 +70,8 @@ O NutriLife resolve o problema de tecnologias obsoletas e dificuldades de suport
 │   └── routers/                # Rotas HTTP
 └── README.md
 
-````
+```
+
 ## 📦 Como contribuir (Instalação local)
 Nota: O projeto está na versão 1.0 (Março/2026).
 
@@ -97,6 +98,11 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 Configure `MONGODB_URI` para o MongoDB local ou Atlas. Não compartilhe o `.env`
 nem coloque a URI do banco ou a chave JWT no frontend.
 
+A recuperação de senha requer servidor SMTP com `SMTP_HOST`, `SMTP_PORT`,
+`SMTP_USERNAME`, `SMTP_PASSWORD` e `SMTP_FROM_EMAIL`; use a porta 587 (STARTTLS)
+ou 465 (TLS). Sem SMTP, os demais fluxos funcionam, mas a recuperação retorna
+indisponibilidade.
+
 3. Inicie a API dentro da pasta `backend`:
 
 ```powershell
@@ -107,15 +113,17 @@ A documentação interativa fica em `http://127.0.0.1:8000/docs`; `/health`
 verifica também a conexão com o banco. As collections e índices são preparados
 automaticamente na inicialização da API.
 
-4. Crie a primeira conta profissional pela linha de comando (a API pública
-cadastra apenas pacientes):
+4. Sirva a pasta `frontend/` com um servidor estático, como Live Server
+(porta padrão `5500`). O endereço local da API está em `frontend/config.js`.
+
+5. Abra a página de autenticação. Nutricionistas podem se cadastrar informando
+o CRN; o CRN não é verificado automaticamente. Para receber agendamentos, a
+profissional deve completar o perfil, informar o link PagSeguro e configurar
+os horários em "Minha agenda".
 
 ```powershell
-python create_nutritionist.py
+Start-Process "http://localhost:5500/pages/auth/login.html"
 ```
-
-5. Sirva a pasta `frontend/` com um servidor estático, como Live Server
-(porta padrão `5500`). O endereço local da API está em `frontend/config.js`.
 
 Contas antigas do protótipo não tinham senha no banco. Para habilitar uma
 conta existente, redefina sua senha localmente com `python reset_password.py`
@@ -123,11 +131,14 @@ conta existente, redefina sua senha localmente com `python reset_password.py`
 
 ### MVP funcional
 
-* Cadastro de pacientes e login com senha armazenada usando Argon2.
-* Tokens JWT temporários; o frontend os mantém apenas na sessão atual do navegador.
-* Perfil, listagem de pacientes para nutricionistas e alteração/remoção da própria conta.
-* CRUD de planos alimentares com acesso limitado ao paciente e à nutricionista responsável.
-* E-mails únicos no MongoDB e CORS configurável por ambiente.
+* Cadastro público de pacientes e nutricionistas (CRN informado, sem validação externa), login e redefinição de senha.
+* Busca pública de nutricionistas por estado e perfis profissionais.
+* Disponibilidade semanal, reserva de horário, link PagSeguro e confirmação manual com link do Teams.
+* Consultas, pacientes e planos alimentares em páginas separadas.
+* Planos com objetivo, duração e refeições compostas por alimentos, quantidades, medidas e calorias.
+* E-mails únicos no MongoDB, CORS configurável por ambiente e acesso aos pacientes limitado a relações existentes.
+
+**Ainda fora do MVP:** integração automática/webhook PagSeguro, chat, avaliações/comentários, assinaturas e busca por distância. O fluxo de recuperação de senha exige SMTP configurado.
 
 ### Publicação
 
@@ -136,7 +147,17 @@ conta existente, redefina sua senha localmente com `python reset_password.py`
 * No provedor do backend configure `APP_ENV=production`, `MONGODB_URI`,
   `MONGODB_DATABASE`, `JWT_SECRET_KEY` (única e aleatória) e `CORS_ORIGINS`
   com a origem exata do Netlify. Separe várias origens por vírgula.
+* Para habilitar recuperação de senha, configure também `FRONTEND_BASE_URL`,
+  `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` e `SMTP_FROM_EMAIL`.
 * `frontend/config.js` é público: nunca coloque segredos nele.
+
+### Testes
+
+Com a `.venv` ativa e dentro de `backend/`:
+
+```powershell
+python -m pytest
+```
 
 ### Testes
 

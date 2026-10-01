@@ -13,9 +13,44 @@ def main() -> None:
     nome = input("Nome da nutricionista: ").strip()
     email = input("E-mail: ").strip()
     senha = getpass("Senha (mínimo 8 caracteres): ")
-    usuario = UsuarioCreate(nome=nome, email=email, senha=senha)
+    telefone = input("Telefone com DDD: ").strip()
+    endereco = input("Endereço profissional: ").strip()
+    cep = input("CEP profissional: ").strip()
+    estado = input("UF (ex.: SP): ").strip().upper()
+    crn = input("CRN: ").strip().upper()
+    specialties = input("Especialidades (separadas por vírgula): ").strip()
+    biography = input("Biografia profissional: ").strip()
+    price = input("Valor da consulta (ex.: 150.00): ").strip()
+    payment_link = input("Link de checkout PagSeguro: ").strip()
+    usuario = UsuarioCreate(
+        nome=nome,
+        email=email,
+        senha=senha,
+        telefone=telefone,
+        endereco=endereco,
+        cep=cep,
+        estado=estado,
+        tipo="nutricionista",
+        crn=crn,
+    )
     try:
-        created = criar_usuario(usuario, hash_password(senha), perfil="nutricionista")
+        created = criar_usuario(usuario, hash_password(senha))
+        from bson import ObjectId
+        from database.connection import get_database
+
+        get_database()["usuarios"].update_one(
+            {"_id": ObjectId(created["id"])},
+            {
+                "$set": {
+                    "especialidades": [
+                        item.strip() for item in specialties.split(",") if item.strip()
+                    ],
+                    "biografia": biography,
+                    "valor_consulta": float(price) if price else 0,
+                    "pagseguro_link": payment_link or None,
+                }
+            },
+        )
     except DuplicateKeyError as error:
         raise SystemExit("Este e-mail já está cadastrado.") from error
     print(f"Nutricionista criada: {created['email']}")

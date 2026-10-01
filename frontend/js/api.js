@@ -40,6 +40,14 @@
             method: "POST",
             body: JSON.stringify(credenciais),
         }),
+        solicitarRecuperacaoSenha: (email) => request("/auth/recuperar-senha", {
+            method: "POST",
+            body: JSON.stringify({ email }),
+        }),
+        redefinirSenha: (token, senha) => request("/auth/redefinir-senha", {
+            method: "POST",
+            body: JSON.stringify({ token, senha }),
+        }),
         perfil: () => request("/usuarios/me"),
         atualizarPerfil: (usuario) => request("/usuarios/me", {
             method: "PUT",
@@ -49,6 +57,12 @@
             method: "DELETE",
         }),
         listarPacientes: () => request("/usuarios"),
+        listarNutricionistas: (estado) => {
+            const query = estado ? `?estado=${encodeURIComponent(estado)}` : "";
+            return request(`/usuarios/nutricionistas${query}`);
+        },
+        obterNutricionista: (id) =>
+            request(`/usuarios/nutricionistas/${encodeURIComponent(id)}`),
         listarPlanos: () => request("/planos"),
         criarPlano: (plano) => request("/planos", {
             method: "POST",
@@ -61,6 +75,32 @@
         excluirPlano: (id) => request(`/planos/${encodeURIComponent(id)}`, {
             method: "DELETE",
         }),
+        obterHorarios: (id, inicio, fim) => {
+            const params = new URLSearchParams({
+                nutricionista_id: id,
+                inicio,
+                fim,
+            });
+            return request(`/consultas/disponibilidade?${params}`);
+        },
+        listarConsultas: () => request("/consultas"),
+        marcarConsulta: (appointment) => request("/consultas", {
+            method: "POST",
+            body: JSON.stringify(appointment),
+        }),
+        cancelarConsulta: (id) => request(`/consultas/${encodeURIComponent(id)}/cancelar`, {
+            method: "PUT",
+        }),
+        confirmarPagamento: (id, link) =>
+            request(`/consultas/${encodeURIComponent(id)}/confirmar-pagamento`, {
+                method: "PUT",
+                body: JSON.stringify({ link_reuniao: link }),
+            }),
+        minhaDisponibilidade: () => request("/consultas/minha-disponibilidade"),
+        salvarDisponibilidade: (availability) => request(
+            "/consultas/minha-disponibilidade",
+            { method: "PUT", body: JSON.stringify(availability) },
+        ),
         salvarToken: (token) => sessionStorage.setItem(TOKEN_KEY, token),
         limparToken: () => sessionStorage.removeItem(TOKEN_KEY),
         possuiToken: () => Boolean(sessionStorage.getItem(TOKEN_KEY)),
