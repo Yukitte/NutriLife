@@ -56,6 +56,15 @@
         excluirConta: () => request("/usuarios/me", {
             method: "DELETE",
         }),
+        listarUsuariosAdministrador: () => request("/admin/usuarios"),
+        atualizarUsuarioAdministrador: (id, usuario) => request(
+            `/admin/usuarios/${encodeURIComponent(id)}`,
+            { method: "PUT", body: JSON.stringify(usuario) },
+        ),
+        excluirUsuarioAdministrador: (id) => request(
+            `/admin/usuarios/${encodeURIComponent(id)}`,
+            { method: "DELETE" },
+        ),
         listarPacientes: () => request("/usuarios"),
         listarNutricionistas: (estado) => {
             const query = estado ? `?estado=${encodeURIComponent(estado)}` : "";

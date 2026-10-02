@@ -55,7 +55,7 @@ def get_current_user(
         raise unauthorized from error
 
     user = buscar_usuario(user_id)
-    if user is None:
+    if user is None or not user.get("ativo", True):
         raise unauthorized
     return user
 
@@ -98,4 +98,13 @@ def create_password_reset_token(user_id: str, nonce: str) -> str:
 def require_nutritionist(user: dict = Depends(get_current_user)) -> dict:
     if user["perfil"] != "nutricionista":
         raise HTTPException(status_code=403, detail="Acesso exclusivo para nutricionistas.")
+    return user
+
+
+def require_administrator(user: dict = Depends(get_current_user)) -> dict:
+    if user["perfil"] != "administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso exclusivo para administradores.",
+        )
     return user

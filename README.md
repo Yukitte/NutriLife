@@ -114,6 +114,14 @@ A documentação interativa fica em `http://127.0.0.1:8000/docs`; `/health`
 verifica também a conexão com o banco. As collections e índices são preparados
 automaticamente na inicialização da API.
 
+Para criar a primeira conta administrativa, abra outro terminal na pasta
+`backend/` e execute `python create_admin.py`. O script usa o MongoDB e o `.env`
+da API, solicita a senha sem exibi-la e exige pelo menos 12 caracteres. O
+cadastro público não permite criar administradores. Depois, entre normalmente
+com essa conta e acesse **Administrar usuários** no painel. Contas com consultas
+ou planos vinculados não podem ser excluídas nem ter o perfil alterado; elas
+podem ser desativadas para preservar o histórico.
+
 4. Sirva a pasta `frontend/` com um servidor estático, como Live Server
 (porta padrão `5500`). O endereço local da API está em `frontend/config.js`.
 

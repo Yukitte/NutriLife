@@ -174,6 +174,17 @@ class UsuarioUpdate(BaseModel):
         return value
 
 
+class AdministradorUsuarioUpdate(UsuarioUpdate):
+    perfil: Literal["paciente", "nutricionista"] | None = None
+    ativo: bool | None = None
+
+    @model_validator(mode="after")
+    def validar_perfil_administrado(self):
+        if self.perfil == "nutricionista" and not self.crn:
+            raise ValueError("Nutricionistas precisam informar o CRN.")
+        return self
+
+
 class UsuarioPublico(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -196,7 +207,7 @@ class UsuarioResponse(BaseModel):
     id: str
     nome: str
     email: EmailStr
-    perfil: Literal["paciente", "nutricionista"]
+    perfil: Literal["paciente", "nutricionista", "administrador"]
     telefone: str = ""
     endereco: str = ""
     cep: str = ""
@@ -207,6 +218,7 @@ class UsuarioResponse(BaseModel):
     valor_consulta: float = 0
     pagseguro_link: str | None = None
     data_inicio: str
+    ativo: bool = True
 
 
 class TokenResponse(BaseModel):

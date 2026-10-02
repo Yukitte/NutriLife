@@ -769,6 +769,12 @@ button {
     color: #9f1c16;
 }
 
+.dashboard-status.is-success {
+    border-color: #b8d9bd;
+    background: #f1f8f1;
+    color: #214a2e;
+}
+
 .dashboard-form {
     display: grid;
     gap: 16px;
@@ -966,6 +972,22 @@ button.calendar-day {
 .food-option-list {
     display: grid;
     gap: 14px;
+}
+
+.meal-template-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid var(--gray-light);
+    border-radius: 14px;
+    background: #f8fbf7;
+}
+
+.meal-template-note {
+    grid-column: 1 / -1;
+    margin: 0;
 }
 
 .meal-editor {
@@ -1512,6 +1534,80 @@ button.calendar-day {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+}
+
+.admin-users-panel {
+    display: grid;
+    gap: 18px;
+}
+
+.admin-users-list {
+    display: grid;
+    gap: 16px;
+}
+
+.admin-user-card {
+    display: grid;
+    gap: 14px;
+    padding: 18px;
+    border: 1px solid var(--gray-light);
+    border-radius: 14px;
+    background: #fff;
+}
+
+.admin-user-card__header,
+.admin-user-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.admin-user-card__header h2 {
+    margin: 0;
+    font-family: var(--font-body);
+    font-size: 1.1rem;
+}
+
+.admin-user-card > p {
+    margin: 0;
+}
+
+.admin-user-form {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    align-items: start;
+}
+
+.admin-user-form__professional-fields {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+}
+
+.admin-user-form__professional-fields[hidden] {
+    display: none;
+}
+
+.admin-user-form__active {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+}
+
+.admin-user-form__active input {
+    width: 20px;
+    height: 20px;
+}
+
+.admin-user-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+}
+
+.admin-user-status--inactive {
+    background: var(--closed-soft);
+    color: #653d42;
 }
 
 .item-tag {

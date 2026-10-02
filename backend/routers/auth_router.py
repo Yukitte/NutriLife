@@ -75,7 +75,7 @@ def login(credentials: UsuarioLogin):
     if usuario is None or not verify_password(
         credentials.senha,
         usuario["senha_hash"],
-    ):
+    ) or not usuario.get("ativo", True):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="E-mail ou senha inválidos.",

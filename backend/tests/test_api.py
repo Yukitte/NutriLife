@@ -8,16 +8,18 @@ from pydantic import ValidationError
 
 import main
 from crud import consulta_crud
+from crud import plano_crud
+from crud import usuario_crud
 from crud.usuario_crud import _serializar_profissional
-from routers import alimento_router, auth_router, consulta_router, usuario_router
+from routers import admin_router, alimento_router, auth_router, consulta_router, usuario_router
 from schemas.consulta_schema import (
     ConsultaAvaliacaoUpdate,
     ConsultaConfirmar,
     ConsultaCreate,
     DisponibilidadeUpdate,
 )
-from schemas.plano_schema import OpcaoAlimento
-from schemas.usuario_schema import UsuarioCreate, UsuarioUpdate
+from schemas.plano_schema import OpcaoAlimento, PlanoUpdate
+from schemas.usuario_schema import AdministradorUsuarioUpdate, UsuarioCreate, UsuarioUpdate
 from scripts.build_taco_catalog import _nutrient_value
 from security import (
     create_access_token,
@@ -96,6 +98,20 @@ def test_public_registration_cannot_choose_role(client):
     assert response.status_code == 422
 
 
+def test_public_registration_cannot_create_an_administrator():
+    with pytest.raises(ValidationError):
+        UsuarioCreate(
+            nome="Admin NutriLife",
+            email="admin@example.com",
+            telefone="61988887777",
+            endereco="Rua das Flores, 10",
+            cep="70000000",
+            estado="DF",
+            senha="senha-segura-123",
+            tipo="administrador",
+        )
+
+
 def test_public_nutritionist_directory_does_not_expose_email(client, monkeypatch):
     monkeypatch.setattr(
         usuario_router,
@@ -137,6 +153,31 @@ def test_public_professional_serializer_omits_private_account_fields():
     assert "pagseguro_link" not in professional
 
 
+def test_public_nutritionist_directory_excludes_deactivated_accounts(monkeypatch):
+    class Professionals:
+        def find(self, query, projection):
+            assert query == {
+                "perfil": "nutricionista",
+                "ativo": {"$ne": False},
+            }
+
+            class Cursor:
+                def sort(self, field, direction):
+                    assert field == "nome"
+                    return []
+
+            return Cursor()
+
+    class Database:
+        def __getitem__(self, name):
+            assert name == "usuarios"
+            return Professionals()
+
+    monkeypatch.setattr(usuario_crud, "get_database", lambda: Database())
+
+    assert usuario_crud.listar_nutricionistas() == []
+
+
 def test_login_returns_access_token_without_password_hash(client, monkeypatch):
     monkeypatch.setattr(
         auth_router,
@@ -161,6 +202,50 @@ def test_login_returns_access_token_without_password_hash(client, monkeypatch):
     assert "senha_hash" not in response.json()["usuario"]
 
 
+def test_inactive_user_cannot_log_in(client, monkeypatch):
+    monkeypatch.setattr(
+        auth_router,
+        "buscar_usuario_com_senha",
+        lambda _: {
+            "_id": ObjectId("507f1f77bcf86cd799439011"),
+            "nome": "Maria Souza",
+            "email": "maria@example.com",
+            "perfil": "paciente",
+            "ativo": False,
+            "senha_hash": "hashed",
+        },
+    )
+    monkeypatch.setattr(auth_router, "verify_password", lambda *_: True)
+
+    response = client.post(
+        "/auth/login",
+        json={"email": "maria@example.com", "senha": "senha-segura-123"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_inactive_user_token_cannot_access_private_routes(client, monkeypatch):
+    user_id = "507f1f77bcf86cd799439011"
+    monkeypatch.setattr(
+        "security.buscar_usuario",
+        lambda _: {
+            "id": user_id,
+            "nome": "Maria Souza",
+            "perfil": "paciente",
+            "ativo": False,
+        },
+    )
+    token = create_access_token(user_id)
+
+    response = client.get(
+        "/usuarios/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 401
+
+
 @pytest.mark.parametrize("path", ["/usuarios", "/planos"])
 def test_private_resources_require_authentication(client, path):
     response = client.get(path)
@@ -170,6 +255,162 @@ def test_private_resources_require_authentication(client, path):
 
 def test_appointment_list_requires_authentication(client):
     assert client.get("/consultas").status_code == 401
+
+
+def test_patient_cannot_access_admin_user_list(client, monkeypatch):
+    patient_id = "507f1f77bcf86cd799439011"
+    monkeypatch.setattr(
+        "security.buscar_usuario",
+        lambda _: {"id": patient_id, "nome": "Maria Souza", "perfil": "paciente"},
+    )
+    token = create_access_token(patient_id)
+
+    response = client.get(
+        "/admin/usuarios",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_administrator_can_list_users_without_password_hash(client, monkeypatch):
+    admin_id = "507f1f77bcf86cd799439011"
+    monkeypatch.setattr(
+        "security.buscar_usuario",
+        lambda _: {
+            "id": admin_id,
+            "nome": "Admin NutriLife",
+            "perfil": "administrador",
+        },
+    )
+    monkeypatch.setattr(
+        admin_router,
+        "listar_usuarios_administrador",
+        lambda: [{
+            "id": "507f1f77bcf86cd799439012",
+            "nome": "Maria Souza",
+            "email": "maria@example.com",
+            "perfil": "paciente",
+            "ativo": True,
+            "data_inicio": "2026-10-01",
+        }],
+    )
+    token = create_access_token(admin_id)
+
+    response = client.get(
+        "/admin/usuarios",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()[0]["nome"] == "Maria Souza"
+    assert "senha_hash" not in response.json()[0]
+
+
+def test_serialized_legacy_users_are_active_by_default():
+    user = usuario_crud.serializar_usuario({
+        "_id": ObjectId("507f1f77bcf86cd799439011"),
+        "nome": "Maria Souza",
+        "email": "maria@example.com",
+        "perfil": "paciente",
+    })
+
+    assert user["ativo"] is True
+
+
+def test_admin_can_deactivate_user_without_changing_profile(monkeypatch):
+    user_id = "507f1f77bcf86cd799439012"
+    user_document = {
+        "_id": ObjectId(user_id),
+        "nome": "Maria Souza",
+        "email": "maria@example.com",
+        "perfil": "paciente",
+        "ativo": True,
+    }
+
+    class Users:
+        def find_one(self, query):
+            return user_document if query["_id"] == ObjectId(user_id) else None
+
+        def update_one(self, query, update):
+            assert query == {"_id": ObjectId(user_id)}
+            user_document.update(update["$set"])
+
+    class Database:
+        def __getitem__(self, name):
+            if name == "usuarios":
+                return Users()
+            pytest.fail(f"No history lookup should be needed in {name}.")
+
+    monkeypatch.setattr(usuario_crud, "get_database", lambda: Database())
+    updated = usuario_crud.atualizar_usuario_administrador(
+        user_id,
+        AdministradorUsuarioUpdate(ativo=False),
+    )
+
+    assert updated["ativo"] is False
+    assert user_document["perfil"] == "paciente"
+
+
+def test_admin_cannot_delete_user_with_consultation_history(monkeypatch):
+    user_id = "507f1f77bcf86cd799439012"
+    user_document = {"_id": ObjectId(user_id), "perfil": "paciente"}
+
+    class Users:
+        def find_one(self, query, projection=None):
+            return user_document
+
+        def delete_one(self, query):
+            pytest.fail("A user with clinical history must not be deleted.")
+
+    class Consultations:
+        def find_one(self, query, projection):
+            return {"_id": ObjectId("507f1f77bcf86cd799439013")}
+
+    class Database:
+        def __getitem__(self, name):
+            if name == "usuarios":
+                return Users()
+            if name == "consultas":
+                return Consultations()
+            pytest.fail(f"Unexpected history lookup in {name}.")
+
+    monkeypatch.setattr(usuario_crud, "get_database", lambda: Database())
+
+    with pytest.raises(ValueError, match="desative"):
+        usuario_crud.remover_usuario_administrador(user_id)
+
+
+def test_admin_cannot_change_profile_of_user_with_history(monkeypatch):
+    user_id = "507f1f77bcf86cd799439012"
+    user_document = {"_id": ObjectId(user_id), "perfil": "paciente"}
+
+    class Users:
+        def find_one(self, query):
+            return user_document
+
+        def update_one(self, query, update):
+            pytest.fail("Role changes with history must be blocked.")
+
+    class Consultations:
+        def find_one(self, query, projection):
+            return {"_id": ObjectId("507f1f77bcf86cd799439013")}
+
+    class Database:
+        def __getitem__(self, name):
+            if name == "usuarios":
+                return Users()
+            if name == "consultas":
+                return Consultations()
+            pytest.fail(f"Unexpected history lookup in {name}.")
+
+    monkeypatch.setattr(usuario_crud, "get_database", lambda: Database())
+
+    with pytest.raises(ValueError, match="perfil"):
+        usuario_crud.atualizar_usuario_administrador(
+            user_id,
+            AdministradorUsuarioUpdate(perfil="nutricionista", crn="CRN1234"),
+        )
 
 
 def test_patient_cannot_create_plan(client, monkeypatch):
@@ -206,6 +447,72 @@ def test_patient_cannot_create_plan(client, monkeypatch):
     )
 
     assert response.status_code == 403
+
+
+def test_update_plan_serializes_nested_meals_without_model_dump_error(monkeypatch):
+    plan_id = "507f1f77bcf86cd799439012"
+    nutritionist_id = "507f1f77bcf86cd799439013"
+    patient_id = "507f1f77bcf86cd799439011"
+    plan_document = {
+        "_id": ObjectId(plan_id),
+        "paciente_id": ObjectId(patient_id),
+        "nutricionista_id": ObjectId(nutritionist_id),
+        "titulo": "Plano atualizado",
+        "objetivo": "Manutenção",
+        "duracao_meses": 3,
+        "descricao": "Orientações atualizadas",
+        "refeicoes": [],
+    }
+
+    class Plans:
+        def update_one(self, query, update):
+            assert query == {
+                "_id": ObjectId(plan_id),
+                "nutricionista_id": ObjectId(nutritionist_id),
+            }
+            plan_document.update(update["$set"])
+
+        def find_one(self, query):
+            return plan_document if query["_id"] == ObjectId(plan_id) else None
+
+    class Users:
+        def find_one(self, query):
+            return {"nome": "Maria Souza" if query["_id"] == ObjectId(patient_id) else "Ana Nutri"}
+
+    class Database:
+        def __getitem__(self, name):
+            if name == "planos":
+                return Plans()
+            assert name == "usuarios"
+            return Users()
+
+    monkeypatch.setattr(plano_crud, "get_database", lambda: Database())
+    changes = PlanoUpdate(
+        titulo="Plano atualizado",
+        objetivo="Manutenção",
+        duracao_meses=3,
+        descricao="Orientações atualizadas",
+        refeicoes=[{
+            "horario": "07:30",
+            "nome": "Café da manhã",
+            "opcoes": [{
+                "nome": "Aveia",
+                "quantidade": 40,
+                "medida": "g",
+                "calorias": 150,
+            }],
+        }],
+    )
+
+    result = plano_crud.atualizar_plano(
+        plan_id,
+        changes,
+        {"id": nutritionist_id},
+    )
+
+    assert result["titulo"] == "Plano atualizado"
+    assert result["refeicoes"][0]["horario"] == "07:30"
+    assert result["refeicoes"][0]["opcoes"][0]["nome"] == "Aveia"
 
 
 def test_food_catalog_search_is_public_and_includes_portions(client, monkeypatch):

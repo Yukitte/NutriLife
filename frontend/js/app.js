@@ -1,6 +1,7 @@
 const api = window.NutriLifeAPI;
 const TOKEN_KEY = "nutrilife_access_token";
 const USER_KEY = "nutrilife_user";
+let adminUsersCache = [];
 
 function setStatus(element, message, type) {
     if (!element) return;
@@ -321,7 +322,7 @@ function appendMealEditor(container, initialMeal) {
         const foodName = document.createElement("input");
         foodName.name = "alimento";
         foodName.type = "search";
-        foodName.placeholder = "Digite para buscar na base USDA";
+        foodName.placeholder = "Digite para buscar na base TACO";
         foodName.maxLength = 250;
         foodName.value = data.nome || "";
         foodName.required = true;
@@ -404,7 +405,7 @@ function appendMealEditor(container, initialMeal) {
                         selectCatalogFood(row, food);
                         results.replaceChildren();
                         searchStatus.textContent =
-                            "Alimento USDA selecionado. Valores nutricionais calculados por gramas.";
+                            "Alimento selecionado. Valores nutricionais calculados por gramas.";
                     });
                     results.append(result);
                 });
@@ -453,8 +454,8 @@ function appendMealEditor(container, initialMeal) {
             inputGroup("Alimento (busca no catálogo ou entrada manual)", foodName),
             searchPanel,
             inputGroup("Porção do catálogo", portions),
-            inputGroup("Quantidade (em gramas para alimentos USDA)", quantity),
-            inputGroup("Medida (seleções USDA usam gramas)", measure),
+            inputGroup("Quantidade (em gramas para alimentos do catálogo)", quantity),
+            inputGroup("Medida (seleções do catálogo usam gramas)", measure),
             inputGroup("Calorias (kcal)", calories),
             nutritionSummary,
         );
@@ -529,6 +530,94 @@ function collectMeals(container) {
     }));
 }
 
+const MEAL_TEMPLATES = {
+    equilibrada: [
+        ["07:00", "Café da manhã"],
+        ["10:00", "Lanche da manhã"],
+        ["12:30", "Almoço"],
+        ["16:00", "Lanche da tarde"],
+        ["19:30", "Jantar"],
+    ],
+    emagrecimento: [
+        ["07:00", "Café da manhã"],
+        ["10:00", "Lanche da manhã"],
+        ["12:30", "Almoço"],
+        ["16:00", "Lanche da tarde"],
+        ["19:00", "Jantar"],
+    ],
+    ganho_massa: [
+        ["07:00", "Café da manhã"],
+        ["10:00", "Lanche pré-treino"],
+        ["12:30", "Almoço"],
+        ["16:00", "Lanche pós-treino"],
+        ["19:30", "Jantar"],
+        ["21:30", "Ceia"],
+    ],
+    vegetariana: [
+        ["07:00", "Café da manhã"],
+        ["10:00", "Lanche da manhã"],
+        ["12:30", "Almoço vegetariano"],
+        ["16:00", "Lanche da tarde"],
+        ["19:30", "Jantar vegetariano"],
+    ],
+};
+
+function createMealTemplateControls(mealContainer, objectiveInput) {
+    const controls = createElement("div", "meal-template-controls");
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", "Base de refeições");
+    select.add(new Option("Selecione uma base de refeições", ""));
+    [
+        ["equilibrada", "Alimentação equilibrada"],
+        ["emagrecimento", "Objetivo: emagrecimento"],
+        ["ganho_massa", "Objetivo: ganho de massa"],
+        ["vegetariana", "Alimentação vegetariana"],
+    ].forEach(([value, label]) => select.add(new Option(label, value)));
+    const objectives = {
+        equilibrada: "Alimentação equilibrada",
+        emagrecimento: "Emagrecimento",
+        ganho_massa: "Ganho de massa",
+        vegetariana: "Alimentação vegetariana",
+    };
+    const apply = createElement("button", "btn btn--ghost", "Carregar base");
+    apply.type = "button";
+    apply.addEventListener("click", () => {
+        const template = MEAL_TEMPLATES[select.value];
+        if (!template) {
+            showDashboardError("Selecione uma base de refeições.");
+            return;
+        }
+        const existingMeals = [...mealContainer.querySelectorAll(".meal-editor")];
+        const hasContent = existingMeals.length > 1 || existingMeals.some((meal) =>
+            meal.querySelector('[name="nome"]').value.trim()
+            || [...meal.querySelectorAll('[name="alimento"]')]
+                .some((food) => food.value.trim()),
+        );
+        if (
+            hasContent
+            && !window.confirm("Carregar esta base substituirá as refeições atuais. Deseja continuar?")
+        ) {
+            return;
+        }
+        if (objectiveInput) objectiveInput.value = objectives[select.value];
+        mealContainer.replaceChildren();
+        template.forEach(([horario, nome]) => {
+            appendMealEditor(mealContainer, { horario, nome, opcoes: [] });
+        });
+    });
+    const note = createElement(
+        "p",
+        "item-meta meal-template-note",
+        "As bases organizam horários e refeições; selecione os alimentos no catálogo TACO e ajuste cada plano às necessidades da paciente.",
+    );
+    controls.append(
+        inputGroup("Base de refeições", select),
+        apply,
+        note,
+    );
+    return controls;
+}
+
 function renderPlans(plans) {
     const container = document.getElementById("plans-list");
     container.replaceChildren();
@@ -540,7 +629,7 @@ function renderPlans(plans) {
     plans.forEach((plan) => {
         const article = createElement("article", "plan-card");
         article.append(
-            createElement("h4", "item-title", plan.titulo),
+            createElement("h4", "item-title", plan.paciente_nome || plan.titulo),
             createElement(
                 "p",
                 "item-meta",
@@ -587,7 +676,7 @@ function renderPlans(plans) {
 
             const title = document.createElement("input");
             title.name = "titulo";
-            title.value = plan.titulo;
+            title.value = plan.paciente_nome || plan.titulo;
             title.required = true;
             title.minLength = 3;
             title.maxLength = 120;
@@ -623,6 +712,7 @@ function renderPlans(plans) {
                 group.append(label, input);
                 editForm.append(group);
             });
+            editForm.append(createMealTemplateControls(mealsInput, objective));
             editForm.append(mealsInput);
             const addMeal = createElement("button", "btn btn--ghost", "Adicionar refeição");
             addMeal.type = "button";
@@ -677,11 +767,225 @@ function renderPlans(plans) {
     });
 }
 
+function renderAdminUsers(users) {
+    const container = document.getElementById("admin-users-list");
+    const search = document.getElementById("admin-user-search").value
+        .trim()
+        .toLocaleLowerCase("pt-BR");
+    const filteredUsers = users.filter((user) =>
+        `${user.nome} ${user.email}`.toLocaleLowerCase("pt-BR").includes(search),
+    );
+    container.replaceChildren();
+    if (!filteredUsers.length) {
+        container.append(createElement("p", "item-meta", "Nenhum usuário encontrado."));
+        return;
+    }
+
+    filteredUsers.forEach((user) => {
+        const card = createElement("article", "admin-user-card");
+        const header = createElement("div", "admin-user-card__header");
+        header.append(
+            createElement("h2", "", user.nome),
+            createElement(
+                "span",
+                `item-tag${user.ativo ? "" : " admin-user-status--inactive"}`,
+                user.ativo ? "Ativo" : "Desativado",
+            ),
+        );
+        card.append(header, createElement("p", "item-meta", user.email));
+        if (user.perfil === "administrador") {
+            card.append(createElement(
+                "p",
+                "item-meta",
+                "Conta administrativa protegida; não pode ser editada ou excluída por este painel.",
+            ));
+            container.append(card);
+            return;
+        }
+
+        const form = createElement("form", "dashboard-form admin-user-form");
+        const name = document.createElement("input");
+        name.name = "nome";
+        name.value = user.nome;
+        name.required = true;
+        name.minLength = 2;
+        name.maxLength = 120;
+        const email = document.createElement("input");
+        email.name = "email";
+        email.type = "email";
+        email.value = user.email;
+        email.required = true;
+        const phone = document.createElement("input");
+        phone.name = "telefone";
+        phone.type = "tel";
+        phone.value = user.telefone || "";
+        const address = document.createElement("input");
+        address.name = "endereco";
+        address.value = user.endereco || "";
+        const zip = document.createElement("input");
+        zip.name = "cep";
+        zip.value = user.cep || "";
+        const state = document.createElement("select");
+        state.name = "estado";
+        state.add(new Option("Selecione", ""));
+        [
+            "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT",
+            "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO",
+            "RR", "SC", "SP", "SE", "TO",
+        ].forEach((uf) => state.add(new Option(uf, uf)));
+        state.value = user.estado || "";
+        const profile = document.createElement("select");
+        profile.name = "perfil";
+        profile.add(new Option("Paciente", "paciente"));
+        profile.add(new Option("Nutricionista", "nutricionista"));
+        profile.value = user.perfil;
+        const crn = document.createElement("input");
+        crn.name = "crn";
+        crn.value = user.crn || "";
+        crn.minLength = 4;
+        crn.maxLength = 20;
+        const crnGroup = inputGroup("CRN", crn);
+        const specialties = document.createElement("input");
+        specialties.name = "especialidades";
+        specialties.value = (user.especialidades || []).join(", ");
+        const biography = document.createElement("textarea");
+        biography.name = "biografia";
+        biography.value = user.biografia || "";
+        biography.maxLength = 2000;
+        const consultationPrice = document.createElement("input");
+        consultationPrice.name = "valor_consulta";
+        consultationPrice.type = "number";
+        consultationPrice.min = "0";
+        consultationPrice.max = "100000";
+        consultationPrice.step = "0.01";
+        consultationPrice.value = String(user.valor_consulta || 0);
+        const paymentLink = document.createElement("input");
+        paymentLink.name = "pagseguro_link";
+        paymentLink.type = "url";
+        paymentLink.value = user.pagseguro_link || "";
+        const active = document.createElement("input");
+        active.name = "ativo";
+        active.type = "checkbox";
+        active.checked = user.ativo;
+        const activeGroup = inputGroup("Conta ativa", active);
+        activeGroup.classList.add("admin-user-form__active");
+        const professionalFields = createElement(
+            "div",
+            "admin-user-form__professional-fields",
+        );
+        professionalFields.append(
+            inputGroup("Especialidades (separadas por vírgula)", specialties),
+            inputGroup("Biografia", biography),
+            inputGroup("Valor da consulta (R$)", consultationPrice),
+            inputGroup("Link de pagamento (HTTPS)", paymentLink),
+        );
+        const updateProfessionalFields = () => {
+            const isNutritionist = profile.value === "nutricionista";
+            crnGroup.hidden = !isNutritionist;
+            crn.required = isNutritionist;
+            professionalFields.hidden = !isNutritionist;
+        };
+        profile.addEventListener("change", updateProfessionalFields);
+        updateProfessionalFields();
+
+        form.append(
+            inputGroup("Nome completo", name),
+            inputGroup("E-mail", email),
+            inputGroup("Telefone", phone),
+            inputGroup("Endereço", address),
+            inputGroup("CEP", zip),
+            inputGroup("Estado (UF)", state),
+            inputGroup("Perfil", profile),
+            crnGroup,
+            professionalFields,
+            activeGroup,
+        );
+        const actions = createElement("div", "admin-user-actions");
+        const save = createElement("button", "btn btn--primary", "Salvar alterações");
+        save.type = "submit";
+        actions.append(save);
+        if (user.id !== JSON.parse(sessionStorage.getItem(USER_KEY) || "{}").id) {
+            const remove = createElement("button", "btn btn--ghost", "Excluir conta");
+            remove.type = "button";
+            remove.addEventListener("click", async () => {
+                if (!window.confirm(
+                    `Excluir a conta de ${user.nome}? Contas com consultas ou planos só podem ser desativadas.`,
+                )) return;
+                remove.disabled = true;
+                try {
+                    await api.excluirUsuarioAdministrador(user.id);
+                    await loadAdminUsersPage();
+                } catch (error) {
+                    showDashboardError(error.message);
+                    remove.disabled = false;
+                }
+            });
+            actions.append(remove);
+        }
+        form.append(actions);
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            save.disabled = true;
+            const values = Object.fromEntries(new FormData(form).entries());
+            const payload = {
+                nome: values.nome,
+                email: values.email,
+                telefone: values.telefone || null,
+                endereco: values.endereco || null,
+                cep: values.cep || null,
+                estado: values.estado || null,
+                perfil: values.perfil,
+                ativo: active.checked,
+            };
+            if (values.perfil === "nutricionista") {
+                payload.crn = values.crn;
+                payload.especialidades = values.especialidades
+                    .split(",").map((value) => value.trim()).filter(Boolean);
+                payload.biografia = values.biografia || null;
+                payload.valor_consulta = Number(values.valor_consulta);
+                payload.pagseguro_link = values.pagseguro_link || null;
+            } else {
+                payload.crn = null;
+            }
+            try {
+                await api.atualizarUsuarioAdministrador(user.id, payload);
+                await loadAdminUsersPage();
+                showDashboardSuccess("Usuário atualizado.");
+            } catch (error) {
+                showDashboardError(error.message);
+                save.disabled = false;
+            }
+        });
+        card.append(form);
+        container.append(card);
+    });
+}
+
+async function loadAdminUsersPage() {
+    adminUsersCache = await api.listarUsuariosAdministrador();
+    const search = document.getElementById("admin-user-search");
+    if (search.dataset.bound !== "true") {
+        search.addEventListener("input", () => renderAdminUsers(adminUsersCache));
+        search.dataset.bound = "true";
+    }
+    renderAdminUsers(adminUsersCache);
+}
+
 function showDashboardError(message) {
     const status = document.getElementById("dashboard-status");
     if (status) {
         status.textContent = message;
         status.hidden = false;
+        status.classList.remove("is-success");
+    }
+}
+
+function showDashboardSuccess(message) {
+    const status = document.getElementById("dashboard-status");
+    if (status) {
+        status.textContent = message;
+        status.hidden = false;
+        status.classList.add("is-success");
     }
 }
 
@@ -689,6 +993,7 @@ function formatDateTime(value) {
     return new Intl.DateTimeFormat("pt-BR", {
         dateStyle: "short",
         timeStyle: "short",
+        hourCycle: "h23",
     }).format(new Date(value));
 }
 
@@ -696,6 +1001,7 @@ function formatTime(value) {
     return new Intl.DateTimeFormat("pt-BR", {
         hour: "2-digit",
         minute: "2-digit",
+        hourCycle: "h23",
     }).format(new Date(value));
 }
 
@@ -1156,14 +1462,9 @@ async function loadAppointmentsPage(user) {
             );
             confirm.type = "button";
             confirm.addEventListener("click", async () => {
-                const teamsLink = window.prompt(
-                    "Link da reunião do Microsoft Teams (opcional). Deixe vazio para confirmar sem link:",
-                    "",
-                );
-                if (teamsLink === null) return;
                 confirm.disabled = true;
                 try {
-                    await api.confirmarConsulta(appointment.id, teamsLink.trim() || null);
+                    await api.confirmarConsulta(appointment.id);
                     await loadAppointmentsPage(user);
                 } catch (error) {
                     showDashboardError(error.message);
@@ -1446,6 +1747,19 @@ function initPageHandlers() {
     if (page === "plans") {
         const createPlanForm = document.getElementById("create-plan-form");
         const mealEditor = document.getElementById("meal-editor");
+        const patientSelect = document.getElementById("plan-patient");
+        const titleInput = document.getElementById("plan-title");
+        patientSelect.addEventListener("change", () => {
+            const patientName = patientSelect.selectedOptions[0]?.dataset.patientName;
+            if (patientName) titleInput.value = patientName;
+        });
+        createPlanForm.insertBefore(
+            createMealTemplateControls(
+                mealEditor,
+                document.getElementById("plan-objective"),
+            ),
+            mealEditor,
+        );
         document.getElementById("add-meal").addEventListener("click", () => {
             appendMealEditor(mealEditor);
         });
@@ -1502,12 +1816,22 @@ async function setCurrentUser() {
     const name = document.getElementById("user-name");
     const role = document.getElementById("user-role");
     if (name) name.textContent = user.nome.split(" ")[0];
-    if (role) role.textContent =
-        user.perfil === "nutricionista" ? "Nutricionista" : "Paciente";
+    if (role) {
+        role.textContent = {
+            nutricionista: "Nutricionista",
+            administrador: "Administrador",
+            paciente: "Paciente",
+        }[user.perfil];
+    }
     const patientsNav = document.getElementById("patients-nav");
     const patientsAction = document.getElementById("patients-action");
     if (patientsNav) patientsNav.hidden = user.perfil !== "nutricionista";
     if (patientsAction) patientsAction.hidden = user.perfil !== "nutricionista";
+    const adminLinks = ["admin-users-nav", "admin-users-action"];
+    adminLinks.forEach((id) => {
+        const link = document.getElementById(id);
+        if (link) link.hidden = user.perfil !== "administrador";
+    });
     const nutritionistOnlyLinks = ["availability-nav", "profile-nav", "calendar-nav"];
     nutritionistOnlyLinks.forEach((id) => {
         const link = document.getElementById(id);
@@ -1545,7 +1869,9 @@ async function loadPlansPage(user) {
         const select = document.getElementById("plan-patient");
         select.replaceChildren(new Option("Selecione um paciente", ""));
         patients.forEach((patient) => {
-            select.add(new Option(`${patient.nome} — ${patient.email}`, patient.id));
+            const option = new Option(`${patient.nome} — ${patient.email}`, patient.id);
+            option.dataset.patientName = patient.nome;
+            select.add(option);
         });
     }
 
@@ -1587,6 +1913,13 @@ async function loadPatientsPage(user) {
 async function loadCurrentPage() {
     const user = await setCurrentUser();
     const page = document.body.dataset.page;
+    if (page === "admin-users") {
+        if (user.perfil !== "administrador") {
+            window.location.replace("../dashboard.html");
+            return;
+        }
+        return loadAdminUsersPage();
+    }
     if (page === "dashboard") return loadDashboard(user);
     if (page === "plans") return loadPlansPage(user);
     if (page === "patients") return loadPatientsPage(user);
@@ -1654,7 +1987,7 @@ function initProtectedPage() {
 document.addEventListener("DOMContentLoaded", () => {
     if (document.body.dataset.page === "auth") initAuthPage();
     if (document.body.dataset.page === "password-reset") initPasswordResetPage();
-    if (["dashboard", "plans", "patients", "search", "patient-home", "professional-profile", "booking", "appointments", "professional-calendar", "professional-profile-edit"].includes(document.body.dataset.page)) {
+    if (["dashboard", "plans", "patients", "search", "patient-home", "professional-profile", "booking", "appointments", "professional-calendar", "professional-profile-edit", "admin-users"].includes(document.body.dataset.page)) {
         initProtectedPage();
     }
 });

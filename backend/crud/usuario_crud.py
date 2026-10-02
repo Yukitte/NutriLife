@@ -4,7 +4,7 @@ from hashlib import sha256
 from bson import ObjectId
 
 from database.connection import get_database
-from schemas.usuario_schema import UsuarioCreate, UsuarioUpdate
+from schemas.usuario_schema import AdministradorUsuarioUpdate, UsuarioCreate, UsuarioUpdate
 
 
 def serializar_usuario(usuario: dict) -> dict:
@@ -23,6 +23,7 @@ def serializar_usuario(usuario: dict) -> dict:
         "valor_consulta": usuario.get("valor_consulta", 0),
         "pagseguro_link": usuario.get("pagseguro_link"),
         "data_inicio": usuario.get("data_inicio", datetime.now(timezone.utc).date().isoformat()),
+        "ativo": usuario.get("ativo", True),
     }
 
 
@@ -135,7 +136,7 @@ def listar_pacientes(nutricionista_id: str) -> list[dict]:
 
 
 def listar_nutricionistas(estado: str | None = None) -> list[dict]:
-    query: dict = {"perfil": "nutricionista"}
+    query: dict = {"perfil": "nutricionista", "ativo": {"$ne": False}}
     if estado:
         query["estado"] = estado.upper()
     professionals = get_database()["usuarios"].find(
@@ -149,7 +150,11 @@ def buscar_nutricionista(usuario_id: str) -> dict | None:
     if not ObjectId.is_valid(usuario_id):
         return None
     professional = get_database()["usuarios"].find_one(
-        {"_id": ObjectId(usuario_id), "perfil": "nutricionista"},
+        {
+            "_id": ObjectId(usuario_id),
+            "perfil": "nutricionista",
+            "ativo": {"$ne": False},
+        },
         {"senha_hash": 0, "endereco": 0, "cep": 0, "pagseguro_link": 0},
     )
     return _serializar_profissional(professional) if professional else None
@@ -179,6 +184,100 @@ def buscar_usuario(usuario_id: str) -> dict | None:
         return None
     usuario = get_database()["usuarios"].find_one({"_id": ObjectId(usuario_id)})
     return serializar_usuario(usuario) if usuario else None
+
+
+def listar_usuarios_administrador() -> list[dict]:
+    users = get_database()["usuarios"].find(
+        {},
+        {"senha_hash": 0, "reset_nonce_hash": 0},
+    ).sort("nome", 1)
+    return [serializar_usuario(user) for user in users]
+
+
+def _usuario_tem_historico(usuario_id: ObjectId) -> bool:
+    database = get_database()
+    relation_query = {
+        "$or": [
+            {"paciente_id": usuario_id},
+            {"nutricionista_id": usuario_id},
+        ]
+    }
+    return bool(
+        database["consultas"].find_one(relation_query, {"_id": 1})
+        or database["planos"].find_one(relation_query, {"_id": 1})
+    )
+
+
+def atualizar_usuario_administrador(
+    usuario_id: str,
+    changes: AdministradorUsuarioUpdate,
+) -> dict | None:
+    if not ObjectId.is_valid(usuario_id):
+        return None
+    user_object_id = ObjectId(usuario_id)
+    current = get_database()["usuarios"].find_one({"_id": user_object_id})
+    if current is None:
+        return None
+    if current.get("perfil") == "administrador":
+        raise ValueError("Contas de administrador não podem ser editadas neste painel.")
+
+    updates = changes.model_dump(exclude_unset=True, exclude_none=True)
+    new_profile = updates.get("perfil")
+    if new_profile and new_profile != current.get("perfil") and _usuario_tem_historico(
+        user_object_id
+    ):
+        raise ValueError(
+            "Não é possível alterar o perfil de uma conta com consultas ou planos vinculados."
+        )
+    if "nome" in updates:
+        updates["nome"] = updates["nome"].strip()
+    if "email" in updates:
+        updates["email"] = str(updates["email"]).lower()
+    if "estado" in updates:
+        updates["estado"] = updates["estado"].strip().upper()
+    if "crn" in updates:
+        updates["crn"] = updates["crn"].strip().upper()
+    if "especialidades" in updates:
+        updates["especialidades"] = [
+            specialty.strip() for specialty in updates["especialidades"]
+        ]
+    if "pagseguro_link" in updates:
+        updates["pagseguro_link"] = str(updates["pagseguro_link"])
+
+    update_document: dict = {}
+    if updates:
+        update_document["$set"] = updates
+    if new_profile == "paciente":
+        update_document["$unset"] = {
+            "crn": "",
+            "especialidades": "",
+            "biografia": "",
+            "valor_consulta": "",
+            "pagseguro_link": "",
+        }
+    if update_document:
+        get_database()["usuarios"].update_one(
+            {"_id": user_object_id},
+            update_document,
+        )
+    return buscar_usuario(usuario_id)
+
+
+def remover_usuario_administrador(usuario_id: str) -> bool:
+    if not ObjectId.is_valid(usuario_id):
+        return False
+    user_object_id = ObjectId(usuario_id)
+    database = get_database()
+    user = database["usuarios"].find_one({"_id": user_object_id}, {"perfil": 1})
+    if user is None:
+        return False
+    if user.get("perfil") == "administrador":
+        raise ValueError("Contas de administrador não podem ser excluídas neste painel.")
+    if _usuario_tem_historico(user_object_id):
+        raise ValueError(
+            "Esta conta possui consultas ou planos; desative-a para preservar o histórico."
+        )
+    return database["usuarios"].delete_one({"_id": user_object_id}).deleted_count == 1
 
 
 def buscar_usuario_com_senha(email: str) -> dict | None:

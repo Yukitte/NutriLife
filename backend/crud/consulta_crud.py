@@ -40,7 +40,11 @@ def obter_disponibilidade(nutricionista_id: str) -> dict | None:
     if not ObjectId.is_valid(nutricionista_id):
         return None
     nutritionist = get_database()["usuarios"].find_one(
-        {"_id": ObjectId(nutricionista_id), "perfil": "nutricionista"},
+        {
+            "_id": ObjectId(nutricionista_id),
+            "perfil": "nutricionista",
+            "ativo": {"$ne": False},
+        },
         {"fuso_horario": 1, "horarios": 1},
     )
     if nutritionist is None:
@@ -122,7 +126,11 @@ def criar_consulta(paciente: dict, consulta: ConsultaCreate) -> dict | None:
 
     nutritionist_id = ObjectId(consulta.nutricionista_id)
     nutritionist = get_database()["usuarios"].find_one(
-        {"_id": nutritionist_id, "perfil": "nutricionista"}
+        {
+            "_id": nutritionist_id,
+            "perfil": "nutricionista",
+            "ativo": {"$ne": False},
+        }
     )
     if nutritionist is None:
         return None

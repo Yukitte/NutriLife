@@ -80,8 +80,10 @@ def atualizar_plano(plano_id: str, changes: PlanoUpdate, nutricionista: dict) ->
         updates["titulo"] = updates["titulo"].strip()
     if "descricao" in updates:
         updates["descricao"] = updates["descricao"].strip()
-    if "refeicoes" in updates:
-        updates["refeicoes"] = [refeicao.model_dump() for refeicao in updates["refeicoes"]]
+    if changes.refeicoes is not None:
+        updates["refeicoes"] = [
+            refeicao.model_dump() for refeicao in changes.refeicoes
+        ]
     if "objetivo" in updates:
         updates["objetivo"] = updates["objetivo"].strip()
 
