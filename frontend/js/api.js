@@ -95,6 +95,13 @@
             return request(`/consultas/disponibilidade?${params}`);
         },
         listarConsultas: () => request("/consultas"),
+        obterAvaliacaoConsulta: (id) =>
+            request(`/consultas/${encodeURIComponent(id)}/avaliacao`),
+        salvarAvaliacaoConsulta: (id, assessment) =>
+            request(`/consultas/${encodeURIComponent(id)}/avaliacao`, {
+                method: "PUT",
+                body: JSON.stringify(assessment),
+            }),
         marcarConsulta: (appointment) => request("/consultas", {
             method: "POST",
             body: JSON.stringify(appointment),
@@ -102,8 +109,8 @@
         cancelarConsulta: (id) => request(`/consultas/${encodeURIComponent(id)}/cancelar`, {
             method: "PUT",
         }),
-        confirmarPagamento: (id, link) =>
-            request(`/consultas/${encodeURIComponent(id)}/confirmar-pagamento`, {
+        confirmarConsulta: (id, link = null) =>
+            request(`/consultas/${encodeURIComponent(id)}/confirmar`, {
                 method: "PUT",
                 body: JSON.stringify({ link_reuniao: link }),
             }),

@@ -42,9 +42,11 @@ def initialize_database() -> None:
         [("nutricionista_id", 1), ("inicio", 1)],
         unique=True,
         partialFilterExpression={
-            "status": {"$in": ["pendente_pagamento", "confirmada"]}
+            "status": {
+                "$in": ["pendente_pagamento", "pendente_confirmacao", "confirmada"]
+            }
         },
-        name="unique_active_appointment_slot",
+        name="unique_active_appointment_slot_v2",
     )
 
 

@@ -66,16 +66,71 @@ class ConsultaCreate(BaseModel):
 class ConsultaConfirmar(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    link_reuniao: AnyHttpUrl
+    link_reuniao: AnyHttpUrl | None = None
 
     @field_validator("link_reuniao")
     @classmethod
-    def validar_link_teams(cls, value: AnyHttpUrl) -> AnyHttpUrl:
+    def validar_link_teams(cls, value: AnyHttpUrl | None) -> AnyHttpUrl | None:
+        if value is None:
+            return None
         if value.scheme != "https":
             raise ValueError("O link da reunião deve usar HTTPS.")
         if value.host not in {"teams.microsoft.com", "teams.live.com"}:
             raise ValueError("Informe um link válido de reunião do Microsoft Teams.")
         return value
+
+
+class ConsultaAvaliacaoUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    idade_anos: int = Field(ge=1, le=120)
+    sexo_biologico: Literal["feminino", "masculino"]
+    peso_kg: float = Field(gt=0, le=500, allow_inf_nan=False)
+    altura_cm: float = Field(gt=0, le=260, allow_inf_nan=False)
+    circunferencia_abdominal_cm: float | None = Field(
+        default=None, gt=0, le=300, allow_inf_nan=False
+    )
+    anotacoes: str = Field(default="", max_length=5000)
+
+    @field_validator("anotacoes")
+    @classmethod
+    def normalizar_anotacoes(cls, value: str) -> str:
+        return value.strip()
+
+    @property
+    def imc(self) -> float:
+        altura_m = self.altura_cm / 100
+        return round(self.peso_kg / (altura_m * altura_m), 1)
+
+    @property
+    def taxa_metabolica_basal_kcal(self) -> int | None:
+        if self.idade_anos < 18:
+            return None
+        sexo_ajuste = -161 if self.sexo_biologico == "feminino" else 5
+        return round(
+            10 * self.peso_kg
+            + 6.25 * self.altura_cm
+            - 5 * self.idade_anos
+            + sexo_ajuste
+        )
+
+
+class ConsultaAvaliacaoResumo(BaseModel):
+    data_registro: datetime
+    peso_kg: float
+    altura_cm: float
+    imc: float
+    taxa_metabolica_basal_kcal: int | None
+
+
+class ConsultaAvaliacaoDetalhe(ConsultaAvaliacaoResumo):
+    id_consulta: str
+    paciente_id: str
+    paciente_nome: str
+    idade_anos: int
+    sexo_biologico: Literal["feminino", "masculino"]
+    circunferencia_abdominal_cm: float | None = None
+    anotacoes: str = ""
 
 
 class ConsultaResponse(BaseModel):
@@ -85,9 +140,16 @@ class ConsultaResponse(BaseModel):
     nutricionista_id: str
     nutricionista_nome: str
     inicio: datetime
-    status: Literal["pendente_pagamento", "confirmada", "cancelada"]
+    status: Literal[
+        "pendente_pagamento",
+        "pendente_confirmacao",
+        "confirmada",
+        "cancelada",
+    ]
     link_pagamento: str | None = None
     link_reuniao: str | None = None
+    avaliacao_registrada: bool = False
+    resumo_avaliacao: ConsultaAvaliacaoResumo | None = None
 
 
 class DisponibilidadePublica(BaseModel):

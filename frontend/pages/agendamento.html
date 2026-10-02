@@ -17,7 +17,7 @@
                 <a href="../dashboard.html" class="sidebar-link">Início</a>
                 <a id="patient-home-nav" href="./home-paciente.html" class="sidebar-link">Minha área</a>
                 <a href="./busca.html" class="sidebar-link">Buscar nutricionista</a>
-                <a href="./consultas.html" class="sidebar-link">Meus agendamentos</a>
+                <a href="./consultas.html" class="sidebar-link">Consultas</a>
             </nav>
             <button id="logout-button" class="sidebar-logout" type="button">Sair</button>
         </aside>
@@ -33,13 +33,13 @@
             <p id="dashboard-status" class="dashboard-status" role="alert" hidden></p>
             <section class="calendar-layout">
                 <div class="panel">
-                    <div class="calendar-weekdays"><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span></div>
+                    <div class="calendar-weekdays"><span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span></div>
                     <div id="availability-calendar" class="availability-calendar" aria-live="polite"></div>
                 </div>
                 <div class="panel">
                     <h3 id="selected-date-title">Selecione um dia</h3>
                     <div id="available-slots" class="slot-list"></div>
-                    <p class="item-meta">A reserva fica pendente até a nutricionista confirmar o pagamento. O link PagSeguro será exibido após reservar.</p>
+                    <p class="item-meta">Quando houver link de pagamento, ele será exibido após a reserva. Sem link configurado, a consulta aguardará a confirmação da nutricionista.</p>
                 </div>
             </section>
         </main>

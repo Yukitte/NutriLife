@@ -54,10 +54,13 @@ class UsuarioCreate(BaseModel):
             raise ValueError("Informe uma sigla de estado válida.")
         return normalized
 
-    @field_validator("crn")
+    @field_validator("crn", mode="before")
     @classmethod
-    def normalizar_crn(cls, value: str | None) -> str | None:
-        return value.strip().upper() if value else None
+    def normalizar_crn(cls, value: object) -> object:
+        if isinstance(value, str):
+            normalized = value.strip().upper()
+            return normalized or None
+        return value
 
     @model_validator(mode="after")
     def validar_crn_do_profissional(self):

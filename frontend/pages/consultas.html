@@ -18,13 +18,19 @@
                 <a id="patient-home-nav" href="./home-paciente.html" class="sidebar-link">Minha área</a>
                 <a href="./busca.html" class="sidebar-link" id="search-nav">Buscar nutricionista</a>
                 <a href="./planos.html" class="sidebar-link">Planos alimentares</a>
-                <a href="./consultas.html" class="sidebar-link is-active" aria-current="page">Agendamentos</a>
+                <a href="./consultas.html" class="sidebar-link is-active" aria-current="page">Consultas</a>
                 <a href="./agenda-profissional.html" class="sidebar-link" id="calendar-nav">Disponibilidade</a>
             </nav>
             <button id="logout-button" class="sidebar-logout" type="button">Sair</button>
         </aside>
         <main class="dashboard-main">
-            <header class="dashboard-header"><div><span class="eyebrow">Agenda</span><h1>Meus agendamentos</h1></div></header>
+            <header class="dashboard-header">
+                <div>
+                    <span class="eyebrow">Acompanhamento</span>
+                    <h1>Consultas</h1>
+                    <p>Consulte os agendamentos e acompanhe os registros da consulta.</p>
+                </div>
+            </header>
             <p id="dashboard-status" class="dashboard-status" role="alert" hidden></p>
             <section id="appointments-list" class="appointment-list" aria-live="polite"><p>Carregando consultas...</p></section>
         </main>

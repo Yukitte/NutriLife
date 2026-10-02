@@ -9,10 +9,15 @@ from crud.consulta_crud import (
     criar_consulta,
     listar_consultas,
     listar_horarios_livres,
+    obter_avaliacao_consulta,
     obter_disponibilidade,
     salvar_disponibilidade,
+    salvar_avaliacao_consulta,
 )
 from schemas.consulta_schema import (
+    ConsultaAvaliacaoDetalhe,
+    ConsultaAvaliacaoResumo,
+    ConsultaAvaliacaoUpdate,
     ConsultaConfirmar,
     ConsultaCreate,
     ConsultaResponse,
@@ -61,6 +66,38 @@ def consultar_minhas_consultas(usuario: dict = Depends(get_current_user)):
     return listar_consultas(usuario)
 
 
+@router.get(
+    "/{consulta_id}/avaliacao",
+    response_model=ConsultaAvaliacaoDetalhe | ConsultaAvaliacaoResumo,
+)
+def consultar_avaliacao(
+    consulta_id: str,
+    usuario: dict = Depends(get_current_user),
+):
+    assessment = obter_avaliacao_consulta(consulta_id, usuario)
+    if assessment is None:
+        raise HTTPException(status_code=404, detail="Avaliação não encontrada.")
+    return assessment
+
+
+@router.put(
+    "/{consulta_id}/avaliacao",
+    response_model=ConsultaAvaliacaoDetalhe,
+)
+def registrar_avaliacao(
+    consulta_id: str,
+    avaliacao: ConsultaAvaliacaoUpdate,
+    nutricionista: dict = Depends(require_nutritionist),
+):
+    assessment = salvar_avaliacao_consulta(consulta_id, avaliacao, nutricionista)
+    if assessment is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Consulta confirmada não encontrada para esta nutricionista.",
+        )
+    return assessment
+
+
 @router.post("", response_model=ConsultaResponse, status_code=status.HTTP_201_CREATED)
 def marcar_consulta(
     consulta: ConsultaCreate,
@@ -79,8 +116,9 @@ def marcar_consulta(
     return created
 
 
+@router.put("/{consulta_id}/confirmar", response_model=ConsultaResponse)
 @router.put("/{consulta_id}/confirmar-pagamento", response_model=ConsultaResponse)
-def confirmar_pagamento(
+def confirmar(
     consulta_id: str,
     meeting: ConsultaConfirmar,
     nutricionista: dict = Depends(require_nutritionist),

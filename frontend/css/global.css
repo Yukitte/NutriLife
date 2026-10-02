@@ -1461,12 +1461,70 @@ button.calendar-day {
     color: #536c5b;
 }
 
+.consultation-assessment {
+    flex: 1 1 100%;
+    display: grid;
+    gap: 14px;
+    padding: 16px;
+    border: 1px solid var(--gray-light);
+    border-radius: 14px;
+    background: #f8fbf7;
+}
+
+.consultation-assessment h4,
+.consultation-assessment p {
+    margin: 0;
+}
+
+.consultation-assessment__fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+}
+
+.consultation-assessment__fields .input-group {
+    min-width: 0;
+}
+
+.consultation-assessment__notes {
+    grid-column: 1 / -1;
+}
+
+.consultation-assessment__status {
+    color: var(--secondary);
+}
+
+.consultation-summary {
+    flex: 1 1 100%;
+    display: grid;
+    gap: 6px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: #f2f7f0;
+}
+
+.consultation-summary h4,
+.consultation-summary p {
+    margin: 0;
+}
+
+.patient-action-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
 .item-tag {
     width: fit-content;
     background: var(--sage-soft);
 }
 
 .item-tag--pendente_pagamento {
+    background: var(--warning-soft);
+    color: #694f0c;
+}
+
+.item-tag--pendente_confirmacao {
     background: var(--warning-soft);
     color: #694f0c;
 }

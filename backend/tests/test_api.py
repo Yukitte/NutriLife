@@ -1,12 +1,21 @@
+from datetime import datetime, timezone
+
 import jwt
 import pytest
+from bson import ObjectId
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 import main
+from crud import consulta_crud
 from crud.usuario_crud import _serializar_profissional
-from routers import alimento_router, auth_router, usuario_router
-from schemas.consulta_schema import DisponibilidadeUpdate
+from routers import alimento_router, auth_router, consulta_router, usuario_router
+from schemas.consulta_schema import (
+    ConsultaAvaliacaoUpdate,
+    ConsultaConfirmar,
+    ConsultaCreate,
+    DisponibilidadeUpdate,
+)
 from schemas.plano_schema import OpcaoAlimento
 from schemas.usuario_schema import UsuarioCreate, UsuarioUpdate
 from scripts.build_taco_catalog import _nutrient_value
@@ -59,6 +68,7 @@ def test_register_creates_patient_and_never_returns_password(client, monkeypatch
             "estado": "DF",
             "senha": "senha-segura-123",
             "tipo": "paciente",
+            "crn": "",
         },
     )
 
@@ -354,6 +364,293 @@ def test_availability_rejects_overlapping_windows():
         )
 
 
+def test_availability_accepts_sao_paulo_timezone():
+    availability = DisponibilidadeUpdate(
+        fuso_horario="America/Sao_Paulo",
+        horarios=[],
+    )
+
+    assert availability.fuso_horario == "America/Sao_Paulo"
+
+
+def test_consultation_without_payment_link_waits_for_nutritionist_confirmation(
+    monkeypatch,
+):
+    patient_id = "507f1f77bcf86cd799439011"
+    nutritionist_id = "507f1f77bcf86cd799439013"
+    appointment_id = ObjectId("507f1f77bcf86cd799439014")
+    start = datetime(2026, 10, 5, 13, tzinfo=timezone.utc)
+
+    class Users:
+        def find_one(self, query):
+            if query["_id"] == ObjectId(nutritionist_id):
+                return {
+                    "_id": ObjectId(nutritionist_id),
+                    "perfil": "nutricionista",
+                    "nome": "Ana Nutri",
+                }
+            assert query["_id"] == ObjectId(patient_id)
+            return {"nome": "Maria Souza"}
+
+    class Consultations:
+        def insert_one(self, document):
+            self.document = document
+            return type("InsertResult", (), {"inserted_id": appointment_id})()
+
+    consultations = Consultations()
+
+    class Database:
+        def __getitem__(self, name):
+            if name == "usuarios":
+                return Users()
+            assert name == "consultas"
+            return consultations
+
+    monkeypatch.setattr(consulta_crud, "get_database", lambda: Database())
+    monkeypatch.setattr(
+        consulta_crud,
+        "listar_horarios_livres",
+        lambda *_: [{"inicio": start}],
+    )
+
+    appointment = consulta_crud.criar_consulta(
+        {"id": patient_id},
+        ConsultaCreate(nutricionista_id=nutritionist_id, inicio=start),
+    )
+
+    assert appointment["status"] == "pendente_confirmacao"
+    assert appointment["link_pagamento"] is None
+    assert consultations.document["status"] == "pendente_confirmacao"
+
+
+def test_nutritionist_can_confirm_consultation_without_payment(monkeypatch):
+    appointment_id = "507f1f77bcf86cd799439014"
+    nutritionist_id = "507f1f77bcf86cd799439013"
+    patient_id = "507f1f77bcf86cd799439011"
+    expected_query = {
+        "_id": ObjectId(appointment_id),
+        "nutricionista_id": ObjectId(nutritionist_id),
+        "status": {"$in": ["pendente_pagamento", "pendente_confirmacao"]},
+    }
+
+    class Consultations:
+        def find_one_and_update(self, query, update, return_document):
+            assert query == expected_query
+            assert update["$set"]["status"] == "confirmada"
+            assert update["$set"]["link_reuniao"] is None
+            return {
+                "_id": ObjectId(appointment_id),
+                "paciente_id": ObjectId(patient_id),
+                "nutricionista_id": ObjectId(nutritionist_id),
+                "inicio": datetime(2026, 10, 5, 13, tzinfo=timezone.utc),
+                "status": update["$set"]["status"],
+                "link_pagamento": None,
+                "link_reuniao": update["$set"]["link_reuniao"],
+            }
+
+    class Users:
+        def find_one(self, query):
+            return {
+                "_id": query["_id"],
+                "nome": "Maria Souza" if query["_id"] == ObjectId(patient_id) else "Ana Nutri",
+            }
+
+    class Database:
+        def __getitem__(self, name):
+            if name == "consultas":
+                return Consultations()
+            assert name == "usuarios"
+            return Users()
+
+    monkeypatch.setattr(consulta_crud, "get_database", lambda: Database())
+    result = consulta_crud.confirmar_consulta(
+        appointment_id,
+        ConsultaConfirmar(),
+        {"id": nutritionist_id},
+    )
+
+    assert result["status"] == "confirmada"
+    assert result["link_reuniao"] is None
+
+
+def test_consultation_confirmation_allows_missing_meeting_link():
+    assert ConsultaConfirmar().link_reuniao is None
+    assert ConsultaConfirmar(link_reuniao=None).link_reuniao is None
+
+
+def test_consultation_assessment_calculates_bmi_and_adult_bmr():
+    assessment = ConsultaAvaliacaoUpdate(
+        idade_anos=30,
+        sexo_biologico="feminino",
+        peso_kg=70,
+        altura_cm=175,
+    )
+
+    assert assessment.imc == 22.9
+    assert assessment.taxa_metabolica_basal_kcal == 1483
+
+
+def test_consultation_assessment_does_not_estimate_bmr_for_minors():
+    assessment = ConsultaAvaliacaoUpdate(
+        idade_anos=17,
+        sexo_biologico="masculino",
+        peso_kg=65,
+        altura_cm=170,
+    )
+
+    assert assessment.taxa_metabolica_basal_kcal is None
+
+
+def test_patient_assessment_endpoint_returns_only_the_summary(client, monkeypatch):
+    appointment_id = "507f1f77bcf86cd799439012"
+    patient_id = "507f1f77bcf86cd799439011"
+    registered_at = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    appointment = {
+        "_id": ObjectId(appointment_id),
+        "paciente_id": ObjectId(patient_id),
+        "avaliacao": {
+            "atualizado_em": registered_at,
+            "idade_anos": 30,
+            "sexo_biologico": "feminino",
+            "peso_kg": 70,
+            "altura_cm": 175,
+            "circunferencia_abdominal_cm": 80,
+            "imc": 22.9,
+            "taxa_metabolica_basal_kcal": 1483,
+            "anotacoes": "Anotação clínica privada",
+        },
+    }
+
+    class Consultations:
+        def find_one(self, query):
+            assert query == {
+                "_id": ObjectId(appointment_id),
+                "paciente_id": ObjectId(patient_id),
+            }
+            return appointment
+
+    class Database:
+        def __getitem__(self, name):
+            assert name == "consultas"
+            return Consultations()
+
+    monkeypatch.setattr(consulta_crud, "get_database", lambda: Database())
+    monkeypatch.setattr(
+        "security.buscar_usuario",
+        lambda _: {"id": patient_id, "nome": "Maria Souza", "perfil": "paciente"},
+    )
+    token = create_access_token(patient_id)
+
+    response = client.get(
+        f"/consultas/{appointment_id}/avaliacao",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert set(response.json()) == {
+        "data_registro",
+        "peso_kg",
+        "altura_cm",
+        "imc",
+        "taxa_metabolica_basal_kcal",
+    }
+    assert "anotacoes" not in response.json()
+
+
+def test_nutritionist_saves_assessment_to_her_confirmed_appointment(monkeypatch):
+    appointment_id = "507f1f77bcf86cd799439012"
+    patient_id = "507f1f77bcf86cd799439011"
+    nutritionist_id = "507f1f77bcf86cd799439013"
+    registered_at = datetime(2026, 9, 1, tzinfo=timezone.utc)
+
+    class Consultations:
+        def find_one(self, query, projection):
+            assert query == {
+                "_id": ObjectId(appointment_id),
+                "nutricionista_id": ObjectId(nutritionist_id),
+                "status": "confirmada",
+            }
+            assert projection == {"avaliacao.registrado_em": 1}
+            return {"avaliacao": {"registrado_em": registered_at}}
+
+        def find_one_and_update(self, query, update, return_document):
+            self.query = query
+            self.assessment = update["$set"]["avaliacao"]
+            return {
+                "_id": ObjectId(appointment_id),
+                "paciente_id": ObjectId(patient_id),
+                "avaliacao": self.assessment,
+            }
+
+    consultations = Consultations()
+
+    class Users:
+        def find_one(self, query):
+            assert query == {"_id": ObjectId(patient_id)}
+            return {"nome": "Maria Souza"}
+
+    class Database:
+        def __getitem__(self, name):
+            if name == "consultas":
+                return consultations
+            assert name == "usuarios"
+            return Users()
+
+    monkeypatch.setattr(consulta_crud, "get_database", lambda: Database())
+    assessment = ConsultaAvaliacaoUpdate(
+        idade_anos=30,
+        sexo_biologico="feminino",
+        peso_kg=70,
+        altura_cm=175,
+        anotacoes="Registro privado",
+    )
+    nutritionist = {"id": nutritionist_id}
+
+    result = consulta_crud.salvar_avaliacao_consulta(
+        appointment_id,
+        assessment,
+        nutritionist,
+    )
+
+    assert result["paciente_id"] == patient_id
+    assert result["anotacoes"] == "Registro privado"
+    assert consultations.query == {
+        "_id": ObjectId(appointment_id),
+        "nutricionista_id": ObjectId(nutritionist_id),
+        "status": "confirmada",
+    }
+    assert consultations.assessment["registrado_em"] == registered_at
+    assert consultations.assessment["registrado_por"] == ObjectId(nutritionist_id)
+    assert consultations.assessment["imc"] == 22.9
+
+
+def test_patient_cannot_write_consultation_assessment(client, monkeypatch):
+    patient_id = "507f1f77bcf86cd799439011"
+    monkeypatch.setattr(
+        "security.buscar_usuario",
+        lambda _: {"id": patient_id, "nome": "Maria Souza", "perfil": "paciente"},
+    )
+    monkeypatch.setattr(
+        consulta_router,
+        "salvar_avaliacao_consulta",
+        lambda *_: pytest.fail("Patient must not reach the assessment write operation."),
+    )
+    token = create_access_token(patient_id)
+
+    response = client.put(
+        "/consultas/507f1f77bcf86cd799439012/avaliacao",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "idade_anos": 30,
+            "sexo_biologico": "feminino",
+            "peso_kg": 70,
+            "altura_cm": 175,
+        },
+    )
+
+    assert response.status_code == 403
+
+
 def test_registration_requires_crn_for_nutritionist():
     with pytest.raises(ValidationError):
         UsuarioCreate(
@@ -366,6 +663,22 @@ def test_registration_requires_crn_for_nutritionist():
             senha="senha-segura-123",
             tipo="nutricionista",
         )
+
+
+def test_registration_normalizes_empty_crn_for_patient():
+    usuario = UsuarioCreate(
+        nome="Maria Souza",
+        email="maria@example.com",
+        telefone="61988887777",
+        endereco="Rua das Flores, 10",
+        cep="70000000",
+        estado="DF",
+        senha="senha-segura-123",
+        tipo="paciente",
+        crn="   ",
+    )
+
+    assert usuario.crn is None
 
 
 def test_health_check_confirms_database_connection(client, monkeypatch):

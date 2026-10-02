@@ -851,7 +851,7 @@ async function loadBookingPage(user) {
         });
 
         calendar.replaceChildren();
-        const firstWeekday = (month.getDay() + 6) % 7;
+        const firstWeekday = month.getDay();
         for (let blank = 0; blank < firstWeekday; blank += 1) {
             calendar.append(createElement("span", "calendar-day calendar-day--empty", ""));
         }
@@ -913,9 +913,10 @@ async function loadBookingPage(user) {
                                 nutricionista_id: nutritionistId,
                                 inicio: slot.inicio,
                             });
-                            slotsContainer.replaceChildren(
-                                createElement("p", "item-meta", "Horário reservado. A consulta aguarda a confirmação manual do pagamento."),
-                            );
+                            const message = appointment.link_pagamento
+                                ? "Horário reservado. A consulta aguarda a confirmação manual do pagamento."
+                                : "Horário solicitado. Aguarde a confirmação da nutricionista.";
+                            slotsContainer.replaceChildren(createElement("p", "item-meta", message));
                             if (appointment.link_pagamento) {
                                 const payment = createElement("a", "btn btn--primary", "Ir para pagamento PagSeguro");
                                 payment.href = appointment.link_pagamento;
@@ -946,28 +947,190 @@ async function loadBookingPage(user) {
     await renderMonth();
 }
 
+function renderPatientAssessmentSummary(card, assessment) {
+    if (!assessment) return;
+    const summary = createElement("section", "consultation-summary");
+    summary.append(createElement("h4", "", "Resumo da consulta"));
+    const numberFormat = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
+    summary.append(createElement(
+        "p",
+        "",
+        `Peso: ${numberFormat.format(assessment.peso_kg)} kg · Altura: ${numberFormat.format(assessment.altura_cm)} cm · IMC: ${numberFormat.format(assessment.imc)}`,
+    ));
+    summary.append(createElement(
+        "p",
+        "item-meta",
+        `Avaliação registrada em ${new Intl.DateTimeFormat("pt-BR", {
+            dateStyle: "short",
+        }).format(new Date(assessment.data_registro))}`,
+    ));
+    summary.append(createElement(
+        "p",
+        "item-meta",
+        assessment.taxa_metabolica_basal_kcal === null
+            ? "TMB: estimativa automática indisponível para menores de 18 anos."
+            : `TMB estimada: ${assessment.taxa_metabolica_basal_kcal} kcal/dia`,
+    ));
+    card.append(summary);
+}
+
+function createAssessmentNumberField(label, name, value, min, max, step) {
+    const input = document.createElement("input");
+    input.name = name;
+    input.type = "number";
+    input.min = String(min);
+    input.max = String(max);
+    input.step = String(step);
+    input.required = name !== "circunferencia_abdominal_cm";
+    if (value !== undefined && value !== null) input.value = String(value);
+    return { input, group: inputGroup(label, input) };
+}
+
+function createAssessmentEditor(appointment, user, savedAssessment) {
+    const section = createElement("section", "consultation-assessment");
+    section.append(createElement("h4", "", "Avaliação nutricional"));
+    const form = createElement("form", "dashboard-form consultation-assessment__form");
+    const age = createAssessmentNumberField("Idade (anos)", "idade_anos", savedAssessment?.idade_anos, 1, 120, 1);
+    const sex = document.createElement("select");
+    sex.name = "sexo_biologico";
+    sex.required = true;
+    sex.add(new Option("Selecione", ""));
+    sex.add(new Option("Feminino", "feminino"));
+    sex.add(new Option("Masculino", "masculino"));
+    if (savedAssessment?.sexo_biologico) sex.value = savedAssessment.sexo_biologico;
+    const weight = createAssessmentNumberField("Peso (kg)", "peso_kg", savedAssessment?.peso_kg, 0.1, 500, 0.1);
+    const height = createAssessmentNumberField("Altura (cm)", "altura_cm", savedAssessment?.altura_cm, 1, 260, 0.1);
+    const waist = createAssessmentNumberField(
+        "Circunferência abdominal (cm, opcional)",
+        "circunferencia_abdominal_cm",
+        savedAssessment?.circunferencia_abdominal_cm,
+        0.1,
+        300,
+        0.1,
+    );
+    const notes = document.createElement("textarea");
+    notes.name = "anotacoes";
+    notes.maxLength = 5000;
+    notes.value = savedAssessment?.anotacoes || "";
+    const fields = createElement("div", "consultation-assessment__fields");
+    fields.append(
+        age.group,
+        inputGroup("Sexo biológico (para a estimativa da TMB)", sex),
+        weight.group,
+        height.group,
+        waist.group,
+    );
+    const notesGroup = inputGroup(
+        "Anotações clínicas (visíveis somente para a nutricionista)",
+        notes,
+    );
+    notesGroup.classList.add("consultation-assessment__notes");
+    const submit = createElement("button", "btn btn--primary", "Salvar avaliação");
+    submit.type = "submit";
+    const status = createElement("p", "item-meta", "");
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    form.append(
+        fields,
+        notesGroup,
+        createElement(
+            "p",
+            "item-meta consultation-assessment__notice",
+            "O IMC e a TMB são calculados pelo sistema. A TMB usa a fórmula Mifflin–St Jeor para adultos; para menores de 18 anos ela não é estimada automaticamente.",
+        ),
+        status,
+        submit,
+    );
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        submit.disabled = true;
+        status.textContent = "Salvando avaliação...";
+        const payload = Object.fromEntries(new FormData(form).entries());
+        payload.idade_anos = Number(payload.idade_anos);
+        payload.peso_kg = Number(payload.peso_kg);
+        payload.altura_cm = Number(payload.altura_cm);
+        payload.circunferencia_abdominal_cm = payload.circunferencia_abdominal_cm
+            ? Number(payload.circunferencia_abdominal_cm)
+            : null;
+        try {
+            await api.salvarAvaliacaoConsulta(appointment.id, payload);
+            status.textContent = "Avaliação salva e vinculada a este paciente.";
+            await loadAppointmentsPage(user);
+        } catch (error) {
+            status.textContent = error.message || "Não foi possível salvar a avaliação.";
+            submit.disabled = false;
+        }
+    });
+    section.append(form);
+    return section;
+}
+
+async function openConsultationAssessment(card, appointment, user, button) {
+    button.disabled = true;
+    try {
+        const existing = card.querySelector(".consultation-assessment");
+        if (existing) {
+            existing.remove();
+            return;
+        }
+        const assessment = appointment.avaliacao_registrada
+            ? await api.obterAvaliacaoConsulta(appointment.id)
+            : null;
+        card.append(createAssessmentEditor(appointment, user, assessment));
+    } catch (error) {
+        showDashboardError(error.message || "Não foi possível carregar a avaliação.");
+    } finally {
+        button.disabled = false;
+    }
+}
+
 async function loadAppointmentsPage(user) {
     const items = await api.listarConsultas();
     const container = document.getElementById("appointments-list");
     container.replaceChildren();
-    if (!items.length) {
+    const patientId = new URLSearchParams(window.location.search).get("paciente_id");
+    const visibleItems = user.perfil === "nutricionista" && patientId
+        ? items.filter((appointment) => appointment.paciente_id === patientId)
+        : items;
+    if (!visibleItems.length) {
         container.append(createElement("p", "item-meta", "Você ainda não tem consultas."));
         return;
     }
-    items.forEach((appointment) => {
+    visibleItems.forEach((appointment) => {
         const card = createElement("article", "panel appointment-card");
         const otherParty = user.perfil === "paciente"
             ? `Nutricionista: ${appointment.nutricionista_nome}`
             : `Paciente: ${appointment.paciente_nome}`;
+        const appointmentStatus = {
+            pendente_pagamento: "Aguardando pagamento",
+            pendente_confirmacao: "Aguardando confirmação",
+            confirmada: "Confirmada",
+            cancelada: "Cancelada",
+        }[appointment.status] || appointment.status.replaceAll("_", " ");
         card.append(
             createElement("h3", "", otherParty),
             createElement("p", "", formatDateTime(appointment.inicio)),
             createElement(
                 "p",
                 `item-tag item-tag--${appointment.status}`,
-                appointment.status.replaceAll("_", " "),
+                appointmentStatus,
             ),
         );
+        if (user.perfil === "nutricionista" && appointment.status === "confirmada") {
+            const assessmentButton = createElement(
+                "button",
+                "btn btn--ghost",
+                appointment.avaliacao_registrada ? "Editar avaliação" : "Registrar avaliação",
+            );
+            assessmentButton.type = "button";
+            assessmentButton.addEventListener("click", () => {
+                openConsultationAssessment(card, appointment, user, assessmentButton);
+            });
+            card.append(assessmentButton);
+        }
+        if (user.perfil === "paciente") {
+            renderPatientAssessmentSummary(card, appointment.resumo_avaliacao);
+        }
         if (user.perfil === "paciente" && appointment.status === "pendente_pagamento" && appointment.link_pagamento) {
             const payment = createElement("a", "btn btn--primary", "Pagar pelo PagSeguro");
             payment.href = appointment.link_pagamento;
@@ -975,22 +1138,36 @@ async function loadAppointmentsPage(user) {
             payment.rel = "noopener noreferrer";
             card.append(payment);
         }
-        if (user.perfil === "nutricionista" && appointment.status === "pendente_pagamento") {
-            const payment = createElement("a", "btn btn--ghost", "Conferir pagamento");
-            payment.href = appointment.link_pagamento || "#";
-            payment.target = "_blank";
-            payment.rel = "noopener noreferrer";
-            card.append(payment);
-            const confirm = createElement("button", "btn btn--primary", "Confirmar pagamento");
+        if (
+            user.perfil === "nutricionista"
+            && ["pendente_pagamento", "pendente_confirmacao"].includes(appointment.status)
+        ) {
+            if (appointment.link_pagamento) {
+                const payment = createElement("a", "btn btn--ghost", "Conferir pagamento");
+                payment.href = appointment.link_pagamento;
+                payment.target = "_blank";
+                payment.rel = "noopener noreferrer";
+                card.append(payment);
+            }
+            const confirm = createElement(
+                "button",
+                "btn btn--primary",
+                appointment.link_pagamento ? "Confirmar pagamento" : "Confirmar consulta",
+            );
             confirm.type = "button";
             confirm.addEventListener("click", async () => {
-                const teamsLink = window.prompt("Informe o link da reunião do Microsoft Teams:");
-                if (!teamsLink) return;
+                const teamsLink = window.prompt(
+                    "Link da reunião do Microsoft Teams (opcional). Deixe vazio para confirmar sem link:",
+                    "",
+                );
+                if (teamsLink === null) return;
+                confirm.disabled = true;
                 try {
-                    await api.confirmarPagamento(appointment.id, teamsLink);
+                    await api.confirmarConsulta(appointment.id, teamsLink.trim() || null);
                     await loadAppointmentsPage(user);
                 } catch (error) {
                     showDashboardError(error.message);
+                    confirm.disabled = false;
                 }
             });
             card.append(confirm);
@@ -1021,14 +1198,22 @@ async function loadAppointmentsPage(user) {
 }
 
 const WEEKDAY_NAMES = [
+    "Domingo",
     "Segunda-feira",
     "Terça-feira",
     "Quarta-feira",
     "Quinta-feira",
     "Sexta-feira",
     "Sábado",
-    "Domingo",
 ];
+
+function calendarWeekdayToAvailabilityIndex(day) {
+    return (day + 6) % 7;
+}
+
+function availabilityIndexToWeekdayName(day) {
+    return WEEKDAY_NAMES[(day + 1) % 7];
+}
 
 function createAvailabilityWindow(day, windowData) {
     const row = createElement("div", "weekday-window");
@@ -1056,7 +1241,7 @@ function createAvailabilityWindow(day, windowData) {
     });
     const remove = createElement("button", "btn btn--ghost weekday-window__remove", "Remover");
     remove.type = "button";
-    remove.setAttribute("aria-label", `Remover horário de ${WEEKDAY_NAMES[day]}`);
+    remove.setAttribute("aria-label", `Remover horário de ${availabilityIndexToWeekdayName(day)}`);
     remove.addEventListener("click", () => {
         row.remove();
         document.dispatchEvent(new Event("availabilitychange"));
@@ -1094,7 +1279,7 @@ function getAvailabilityDraft() {
 function renderAvailabilityDay(selectedDate, weeklySchedule) {
     const title = document.getElementById("availability-selected-date");
     const details = document.getElementById("availability-day-schedule");
-    const dayOfWeek = (selectedDate.getDay() + 6) % 7;
+    const dayOfWeek = calendarWeekdayToAvailabilityIndex(selectedDate.getDay());
     const daySchedule = weeklySchedule.filter((window) => window.dia_semana === dayOfWeek);
     title.textContent = new Intl.DateTimeFormat("pt-BR", {
         weekday: "long",
@@ -1131,14 +1316,14 @@ function renderProfessionalAvailabilityCalendar(month, selectedDate) {
         year: "numeric",
     }).format(month);
     calendar.replaceChildren();
-    const firstWeekday = (month.getDay() + 6) % 7;
+    const firstWeekday = month.getDay();
     for (let blank = 0; blank < firstWeekday; blank += 1) {
         calendar.append(createElement("span", "calendar-day calendar-day--empty", ""));
     }
     const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
     for (let day = 1; day <= daysInMonth; day += 1) {
         const date = new Date(month.getFullYear(), month.getMonth(), day);
-        const dayOfWeek = (date.getDay() + 6) % 7;
+        const dayOfWeek = calendarWeekdayToAvailabilityIndex(date.getDay());
         const windows = windowsByWeekday.get(dayOfWeek) || [];
         const isSelected = date.toDateString() === selectedDate.toDateString();
         const button = createElement(
@@ -1184,7 +1369,8 @@ async function loadProfessionalCalendarPage() {
     let selectedDate = new Date();
 
     document.getElementById("timezone").value = current.fuso_horario;
-    WEEKDAY_NAMES.forEach((weekdayName, day) => {
+    WEEKDAY_NAMES.forEach((weekdayName, calendarDay) => {
+        const day = calendarWeekdayToAvailabilityIndex(calendarDay);
         const daySchedule = current.horarios.filter((window) => window.dia_semana === day);
         const section = createElement("section", "weekday-schedule");
         const heading = createElement("div", "weekday-schedule__heading");
@@ -1389,7 +1575,11 @@ async function loadPatientsPage(user) {
         );
         const plansLink = createElement("a", "btn btn--ghost", "Ver planos");
         plansLink.href = "./planos.html";
-        item.append(info, plansLink);
+        const consultationsLink = createElement("a", "btn btn--ghost", "Ver consultas");
+        consultationsLink.href = `./consultas.html?paciente_id=${encodeURIComponent(patient.id)}`;
+        const actions = createElement("div", "patient-action-links");
+        actions.append(plansLink, consultationsLink);
+        item.append(info, actions);
         list.append(item);
     });
 }
