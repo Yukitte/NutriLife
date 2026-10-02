@@ -9,11 +9,24 @@ ESTADOS_BR = {
 }
 
 
+def normalizar_cpf(value: str) -> str:
+    digitos = "".join(character for character in value if character.isdigit())
+    if len(digitos) != 11 or len(set(digitos)) == 1:
+        raise ValueError("Informe um CPF válido.")
+    for posicao in (9, 10):
+        soma = sum(int(digitos[i]) * (posicao + 1 - i) for i in range(posicao))
+        verificador = (soma * 10) % 11 % 10
+        if verificador != int(digitos[posicao]):
+            raise ValueError("Informe um CPF válido.")
+    return digitos
+
+
 class UsuarioCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     nome: str = Field(min_length=2, max_length=120)
     email: EmailStr
+    cpf: str = Field(min_length=11, max_length=14)
     telefone: str = Field(min_length=8, max_length=24)
     endereco: str = Field(min_length=3, max_length=200)
     cep: str = Field(min_length=8, max_length=9)
@@ -37,6 +50,11 @@ class UsuarioCreate(BaseModel):
         if not 10 <= len(normalized) <= 13:
             raise ValueError("Informe um telefone com DDD.")
         return normalized
+
+    @field_validator("cpf")
+    @classmethod
+    def validar_cpf(cls, value: str) -> str:
+        return normalizar_cpf(value)
 
     @field_validator("cep")
     @classmethod
@@ -82,6 +100,19 @@ class RecuperacaoSenhaSolicitar(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     email: EmailStr
+
+
+class RecuperacaoSenhaCpf(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cpf: str = Field(min_length=11, max_length=14)
+    email: EmailStr
+    senha: str = Field(min_length=8, max_length=128)
+
+    @field_validator("cpf")
+    @classmethod
+    def validar_cpf(cls, value: str) -> str:
+        return normalizar_cpf(value)
 
 
 class RecuperacaoSenhaConfirmar(BaseModel):
@@ -199,6 +230,7 @@ class UsuarioPublico(BaseModel):
     nota_media: float = 0
     total_pacientes: int = 0
     data_inicio: str
+    distancia_km: float | None = None
 
 
 class UsuarioResponse(BaseModel):

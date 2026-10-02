@@ -12,6 +12,7 @@ def main() -> None:
     initialize_database()
     nome = input("Nome da nutricionista: ").strip()
     email = input("E-mail: ").strip()
+    cpf = input("CPF: ").strip()
     senha = getpass("Senha (mínimo 8 caracteres): ")
     telefone = input("Telefone com DDD: ").strip()
     endereco = input("Endereço profissional: ").strip()
@@ -25,6 +26,7 @@ def main() -> None:
     usuario = UsuarioCreate(
         nome=nome,
         email=email,
+        cpf=cpf,
         senha=senha,
         telefone=telefone,
         endereco=endereco,
@@ -52,7 +54,7 @@ def main() -> None:
             },
         )
     except DuplicateKeyError as error:
-        raise SystemExit("Este e-mail já está cadastrado.") from error
+        raise SystemExit("Este e-mail ou CPF já está cadastrado.") from error
     print(f"Nutricionista criada: {created['email']}")
 
 

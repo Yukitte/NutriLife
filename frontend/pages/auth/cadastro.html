@@ -29,34 +29,67 @@
                     <input id="register-email" name="email" type="email" placeholder="seu@email.com" autocomplete="email" required>
                 </div>
                 <div class="input-group">
-                    <label for="register-phone">Telefone com DDD</label>
-                    <input id="register-phone" name="telefone" type="tel" autocomplete="tel" required>
+                    <label for="register-cpf">CPF</label>
+                    <input id="register-cpf" name="cpf" inputmode="numeric" placeholder="000.000.000-00" minlength="14" maxlength="14" pattern="\d{3}\.\d{3}\.\d{3}-\d{2}" title="Informe o CPF, ex.: 000.000.000-00" required>
                 </div>
                 <div class="input-group">
-                    <label for="register-address">Endereço</label>
-                    <input id="register-address" name="endereco" autocomplete="street-address" required>
+                    <label for="register-phone">Telefone com DDD</label>
+                    <input id="register-phone" name="telefone" type="tel" autocomplete="tel" inputmode="numeric" placeholder="(00) 00000-0000" minlength="14" maxlength="15" pattern="\(\d{2}\) \d{4,5}-\d{4}" title="Informe o telefone com DDD, ex.: (61) 99999-9999" required>
                 </div>
                 <div class="registration-location">
                     <div class="input-group">
                         <label for="register-cep">CEP</label>
-                        <input id="register-cep" name="cep" inputmode="numeric" autocomplete="postal-code" minlength="8" maxlength="9" required>
+                        <input id="register-cep" name="cep" inputmode="numeric" autocomplete="postal-code" placeholder="00000-000" minlength="8" maxlength="9" aria-describedby="register-cep-hint" required>
+                        <small class="input-hint" id="register-cep-hint">Digite o CEP para preencher o endereço.</small>
                     </div>
                     <div class="input-group">
                         <label for="register-state">Estado (UF)</label>
                         <select id="register-state" name="estado" required>
                             <option value="">Selecione</option>
-                            <option>AC</option><option>AL</option><option>AP</option><option>AM</option><option>BA</option>
-                            <option>CE</option><option>DF</option><option>ES</option><option>GO</option><option>MA</option>
-                            <option>MT</option><option>MS</option><option>MG</option><option>PA</option><option>PB</option>
-                            <option>PR</option><option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
-                            <option>RS</option><option>RO</option><option>RR</option><option>SC</option><option>SP</option>
-                            <option>SE</option><option>TO</option>
+                                <option>AC</option><option>AL</option><option>AP</option><option>AM</option><option>BA</option>
+                                <option>CE</option><option>DF</option><option>ES</option><option>GO</option><option>MA</option>
+                                <option>MT</option><option>MS</option><option>MG</option><option>PA</option><option>PB</option>
+                                <option>PR</option><option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+                                <option>RS</option><option>RO</option><option>RR</option><option>SC</option><option>SP</option>
+                                <option>SE</option><option>TO</option>
                         </select>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="register-street">Rua</label>
+                    <input id="register-street" name="rua" autocomplete="address-line1" placeholder="Nome da rua ou avenida" maxlength="120" required>
+                </div>
+
+                <div class="registration-location">
+                    <div class="input-group">
+                        <label for="register-number">Número</label>
+                        <input id="register-number" name="numero" placeholder="Ex.: 120" maxlength="10" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="register-complement">Complemento (opcional)</label>
+                        <input id="register-complement" name="complemento" autocomplete="address-line2" placeholder="Apto, bloco, sala..." maxlength="40">
+                    </div>
+                </div>
+
+                <div class="registration-location">
+                    <div class="input-group">
+                        <label for="register-district">Bairro</label>
+                        <input id="register-district" name="bairro" placeholder="Seu bairro" maxlength="60" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="register-city">Cidade</label>
+                        <input id="register-city" name="cidade" autocomplete="address-level2" placeholder="Sua cidade" maxlength="60" required>
                     </div>
                 </div>
                 <div class="input-group">
                     <label for="register-password">Senha</label>
                     <input id="register-password" name="senha" type="password" placeholder="Mínimo de 8 caracteres" autocomplete="new-password" minlength="8" maxlength="128" required>
+                </div>
+
+                <div class="input-group">
+                    <label for="register-password-confirm">Confirmar senha</label>
+                    <input id="register-password-confirm" name="confirmar_senha" type="password" placeholder="Repita a senha" autocomplete="new-password" minlength="8" maxlength="128" required>
                 </div>
                 <div class="input-group">
                     <label for="register-type">Tipo de conta</label>
@@ -67,7 +100,7 @@
                 </div>
                 <div class="input-group" id="register-crn-group" hidden>
                     <label for="register-crn">CRN</label>
-                    <input id="register-crn" name="crn" minlength="4" maxlength="20">
+                    <input id="register-crn" name="crn" placeholder="Ex.: CRN-3 12345" minlength="4" maxlength="12" pattern="[A-Za-z0-9 /-]{4,12}" title="Use até 12 caracteres: letras, números, espaço, hífen ou barra">
                 </div>
                 <button type="submit" class="btn btn--primary">Criar conta</button>
                 <p class="auth-status" aria-live="polite"></p>

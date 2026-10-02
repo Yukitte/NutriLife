@@ -18,10 +18,15 @@
                 </a>
             </div>
             <nav class="sidebar-nav" aria-label="Navegação do painel">
-                <a href="../dashboard.html" class="sidebar-link">Visão geral</a>
-                <a id="patient-home-nav" href="./home-paciente.html" class="sidebar-link">Minha área</a>
-                <a href="./planos.html" class="sidebar-link is-active" aria-current="page">Planos alimentares</a>
-                <a id="patients-nav" href="./pacientes.html" class="sidebar-link">Pacientes</a>
+                <a id="overview-nav" href="../dashboard.html" class="sidebar-link" hidden>Visão geral</a>
+                <a id="patient-home-nav" href="./home-paciente.html" class="sidebar-link" hidden>Minha área</a>
+                <a id="search-nav" href="./busca.html" class="sidebar-link" hidden>Buscar nutricionista</a>
+                <a id="patients-nav" href="./pacientes.html" class="sidebar-link" hidden>Pacientes</a>
+                <a id="plans-nav" href="./planos.html" class="sidebar-link is-active" aria-current="page" hidden>Planos alimentares</a>
+                <a id="appointments-nav" href="./consultas.html" class="sidebar-link" hidden>Agendamentos</a>
+                <a id="availability-nav" href="./agenda-profissional.html" class="sidebar-link" hidden>Disponibilidade</a>
+                <a id="profile-nav" href="./perfil-profissional.html" class="sidebar-link" hidden>Meu perfil</a>
+                <a id="admin-users-nav" href="./administracao.html" class="sidebar-link" hidden>Administrar usuários</a>
             </nav>
             <button id="logout-button" class="sidebar-logout" type="button">Sair</button>
         </aside>
@@ -37,16 +42,22 @@
             </header>
             <p id="dashboard-status" class="dashboard-status" role="alert" hidden></p>
 
-            <section class="dashboard-grid">
-                <article class="panel">
-                    <h3>Seus planos</h3>
+            <section class="dashboard-grid dashboard-grid--stacked">
+                <article id="plans-panel" class="panel" data-collapsible>
+                    <div class="panel__head">
+                        <h3>Seus planos</h3>
+                        <button type="button" class="panel-toggle" aria-expanded="true" aria-label="Esconder Seus planos"></button>
+                    </div>
                     <div id="plans-list" class="plans-list" aria-live="polite">
                         <p class="item-meta">Carregando planos...</p>
                     </div>
                 </article>
 
-                <article id="create-plan-panel" class="panel" hidden>
-                    <h3>Criar plano alimentar</h3>
+                <article id="create-plan-panel" class="panel" data-collapsible hidden>
+                    <div class="panel__head">
+                        <h3>Criar plano alimentar</h3>
+                        <button type="button" class="panel-toggle" aria-expanded="true" aria-label="Esconder Criar plano alimentar"></button>
+                    </div>
                     <form id="create-plan-form" class="dashboard-form">
                         <div class="input-group">
                             <label for="plan-patient">Paciente</label>
@@ -78,6 +89,11 @@
             </section>
         </main>
     </div>
+    <footer class="app-footer">
+        <img src="../assets/images/NutriLife-logo-semfundo.png" alt="NutriLife" class="app-footer__logo">
+        <p>© 2026 NutriLife. Todos os direitos reservados.</p>
+    </footer>
+
     <script src="../config.js" defer></script>
     <script src="../js/api.js" defer></script>
     <script src="../js/app.js" defer></script>

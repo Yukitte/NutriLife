@@ -3,8 +3,43 @@ const TOKEN_KEY = "nutrilife_access_token";
 const USER_KEY = "nutrilife_user";
 let adminUsersCache = [];
 
+function mostrarToast(mensagem, tipo = "sucesso") {
+    if (!mensagem) return;
+    let area = document.getElementById("toast-area");
+    if (!area) {
+        area = document.createElement("div");
+        area.id = "toast-area";
+        area.className = "toast-area";
+        document.body.append(area);
+    }
+    const toast = document.createElement("div");
+    toast.className = `toast toast--${tipo}`;
+    toast.setAttribute("role", tipo === "erro" ? "alert" : "status");
+    const texto = document.createElement("p");
+    texto.textContent = mensagem;
+    const fechar = document.createElement("button");
+    fechar.type = "button";
+    fechar.className = "toast__close";
+    fechar.textContent = "✕";
+    fechar.setAttribute("aria-label", "Fechar mensagem");
+    const remover = () => {
+        toast.classList.add("is-leaving");
+        window.setTimeout(() => toast.remove(), 200);
+    };
+    fechar.addEventListener("click", remover);
+    toast.append(texto, fechar);
+    area.append(toast);
+    window.setTimeout(remover, tipo === "erro" ? 6000 : 4000);
+}
+
 function setStatus(element, message, type) {
     if (!element) return;
+    if (type === "error" || type === "success") {
+        element.textContent = "";
+        element.className = "auth-status";
+        mostrarToast(message, type === "error" ? "erro" : "sucesso");
+        return;
+    }
     element.textContent = message;
     element.className = `auth-status${type ? ` is-${type}` : ""}`;
 }
@@ -34,6 +69,111 @@ function switchAuthTab(tabName) {
     }
 }
 
+function montarEnderecoCadastro(values) {
+    const { rua, numero, complemento, bairro, cidade, confirmar_senha: _confirmacao, ...resto } = values;
+    const complementoTexto = complemento && complemento.trim() ? ` - ${complemento.trim()}` : "";
+    return { ...resto, endereco: `${rua.trim()}, ${numero.trim()}${complementoTexto}, ${bairro.trim()}, ${cidade.trim()}` };
+}
+
+function configurarCpf(input) {
+    if (!input) return;
+    input.addEventListener("input", () => {
+        const digitos = input.value.replace(/\D/g, "").slice(0, 11);
+        input.value = digitos
+            .replace(/^(\d{3})(\d)/, "$1.$2")
+            .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+            .replace(/\.(\d{3})(\d)/, ".$1-$2");
+    });
+}
+
+function configurarTelefone(input) {
+    if (!input) return;
+    input.addEventListener("input", () => {
+        const digitos = input.value.replace(/\D/g, "").slice(0, 11);
+        let valor = digitos;
+        if (digitos.length > 2) valor = `(${digitos.slice(0, 2)}) ${digitos.slice(2)}`;
+        if (digitos.length > 6) {
+            const meio = digitos.length === 11 ? 7 : 6;
+            valor = `(${digitos.slice(0, 2)}) ${digitos.slice(2, meio)}-${digitos.slice(meio)}`;
+        }
+        input.value = valor;
+    });
+}
+
+function configurarConfirmacaoSenha(senha, confirmacao) {
+    if (!senha || !confirmacao) return;
+    const validar = () => {
+        const diferente = confirmacao.value && confirmacao.value !== senha.value;
+        confirmacao.setCustomValidity(diferente ? "As senhas não coincidem." : "");
+    };
+    senha.addEventListener("input", validar);
+    confirmacao.addEventListener("input", validar);
+}
+
+function adicionarOlhoSenha() {
+    document.querySelectorAll('input[type="password"]').forEach((input) => {
+        if (input.closest(".password-field")) return;
+        const campo = document.createElement("div");
+        campo.className = "password-field";
+        input.parentNode.insertBefore(campo, input);
+        campo.append(input);
+
+        const botao = document.createElement("button");
+        botao.type = "button";
+        botao.className = "password-toggle";
+        botao.setAttribute("aria-label", "Mostrar senha");
+        botao.setAttribute("aria-pressed", "false");
+        botao.addEventListener("click", () => {
+            const mostrar = input.type === "password";
+            input.type = mostrar ? "text" : "password";
+            botao.classList.toggle("is-visible", mostrar);
+            botao.setAttribute("aria-label", mostrar ? "Ocultar senha" : "Mostrar senha");
+            botao.setAttribute("aria-pressed", String(mostrar));
+        });
+        campo.append(botao);
+    });
+}
+
+function configurarBuscaCep(form) {
+    const cep = form.elements.cep;
+    const dica = form.querySelector("#register-cep-hint");
+    if (!cep || !dica) return;
+
+    const mostrarDica = (texto, erro = false) => {
+        dica.textContent = texto;
+        dica.classList.toggle("input-hint--error", erro);
+    };
+
+    const buscar = async (digitos) => {
+        mostrarDica("Buscando endereço...");
+        try {
+            const resposta = await fetch(`https://viacep.com.br/ws/${digitos}/json/`);
+            if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
+            const dados = await resposta.json();
+            if (cep.value.replace(/\D/g, "") !== digitos) return;
+            if (dados.erro) {
+                mostrarDica("CEP não encontrado. Preencha o endereço manualmente.", true);
+                return;
+            }
+            form.elements.rua.value = dados.logradouro || "";
+            form.elements.bairro.value = dados.bairro || "";
+            form.elements.cidade.value = dados.localidade || "";
+            form.elements.estado.value = dados.uf || "";
+            mostrarDica("Endereço encontrado. Confira e informe o número.");
+            form.elements.numero.focus();
+        } catch {
+            mostrarDica("Não foi possível buscar o CEP. Preencha o endereço manualmente.", true);
+        }
+    };
+
+    cep.addEventListener("input", () => {
+        const digitos = cep.value.replace(/\D/g, "").slice(0, 8);
+        cep.value = digitos.length > 5 ? `${digitos.slice(0, 5)}-${digitos.slice(5)}` : digitos;
+        if (digitos.length === 8) buscar(digitos);
+        else mostrarDica("Digite o CEP para preencher o endereço.");
+    });
+}
+
 async function submitAuthForm(event, action) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -50,7 +190,7 @@ async function submitAuthForm(event, action) {
         window.location.href = "../../dashboard.html";
     } catch (error) {
         const message = error.status === 409
-            ? "Este e-mail já está cadastrado."
+            ? error.message || "Este e-mail já está cadastrado."
             : error.status === 422
                 ? "Confira os dados informados e tente novamente."
                 : error.status === 401
@@ -64,43 +204,27 @@ async function submitAuthForm(event, action) {
 
 function initPasswordResetPage() {
     const form = document.getElementById("password-reset-form");
-    const token = new URLSearchParams(window.location.search).get("token");
-    const emailGroup = document.getElementById("reset-email-group");
-    const email = document.getElementById("reset-email");
-    const passwordFields = document.getElementById("reset-password-fields");
     const password = document.getElementById("reset-password");
     const confirmation = document.getElementById("reset-confirm-password");
-    emailGroup.hidden = Boolean(token);
-    email.required = !token;
-    passwordFields.hidden = !token;
-    password.required = Boolean(token);
-    confirmation.required = Boolean(token);
+    configurarCpf(document.getElementById("reset-cpf"));
+    configurarConfirmacaoSenha(password, confirmation);
 
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
         const status = document.getElementById("reset-status");
         const button = form.querySelector('button[type="submit"]');
+        const values = Object.fromEntries(new FormData(form).entries());
         button.disabled = true;
         try {
-            if (token) {
-                if (password.value !== confirmation.value) {
-                    throw new Error("As senhas não conferem.");
-                }
-                await api.redefinirSenha(token, password.value);
-                setStatus(status, "Senha redefinida. Você já pode fazer login.", "success");
-                form.reset();
-                button.hidden = true;
-            } else {
-                await api.solicitarRecuperacaoSenha(email.value);
-                setStatus(
-                    status,
-                    "Se o e-mail estiver cadastrado, enviaremos instruções para redefinir sua senha.",
-                    "success",
-                );
-                form.reset();
-            }
+            await api.redefinirSenhaPorCpf({ cpf: values.cpf, email: values.email, senha: values.senha });
+            setStatus(status, "Senha redefinida. Você já pode fazer login.", "success");
+            form.reset();
+            button.hidden = true;
         } catch (error) {
-            setStatus(status, error.message || "Não foi possível redefinir a senha.", "error");
+            const message = error.status === 422
+                ? "Confira o CPF e o e-mail informados."
+                : error.message || "Não foi possível redefinir a senha.";
+            setStatus(status, message, "error");
         } finally {
             button.disabled = false;
         }
@@ -122,7 +246,14 @@ function initAuthPage() {
     const registerForm = document.getElementById("register-form");
     if (registerForm) {
         registerForm.addEventListener("submit", (event) => {
-            submitAuthForm(event, (values) => api.cadastrarUsuario(values));
+            submitAuthForm(event, (values) => api.cadastrarUsuario(montarEnderecoCadastro(values)));
+        });
+        configurarBuscaCep(registerForm);
+        configurarTelefone(registerForm.elements.telefone);
+        configurarCpf(registerForm.elements.cpf);
+        configurarConfirmacaoSenha(registerForm.elements.senha, registerForm.elements.confirmar_senha);
+        registerForm.elements.crn?.addEventListener("input", (event) => {
+            event.target.value = event.target.value.toUpperCase();
         });
     }
     document.querySelectorAll(".auth-tab").forEach((tab) => {
@@ -298,7 +429,7 @@ function appendMealEditor(container, initialMeal) {
     const meal = initialMeal || {
         horario: "07:00",
         nome: "",
-        opcoes: [{ nome: "", quantidade: 1, medida: "porção", calorias: 0 }],
+        alimentos: [{ nome: "", quantidade: 1, medida: "porção", calorias: 0 }],
     };
     const card = document.createElement("fieldset");
     card.className = "meal-editor";
@@ -316,13 +447,15 @@ function appendMealEditor(container, initialMeal) {
     name.required = true;
     const foods = createElement("div", "food-option-list");
 
-    function addFoodOption(option) {
+    function buildFoodRow(option, removeLabel, onRemove) {
         const data = option || { nome: "", quantidade: 1, medida: "porção", calorias: 0 };
         const row = createElement("div", "food-option-row");
         const foodName = document.createElement("input");
         foodName.name = "alimento";
         foodName.type = "search";
-        foodName.placeholder = "Digite para buscar na base TACO";
+        foodName.placeholder = "Buscar alimento na TACO ou digitar";
+        foodName.setAttribute("aria-label", "Alimento");
+        foodName.autocomplete = "off";
         foodName.maxLength = 250;
         foodName.value = data.nome || "";
         foodName.required = true;
@@ -349,9 +482,11 @@ function appendMealEditor(container, initialMeal) {
         quantity.step = "0.01";
         quantity.value = data.quantidade || 1;
         quantity.required = true;
+        quantity.setAttribute("aria-label", "Quantidade");
         const measure = document.createElement("input");
         measure.name = "medida";
-        measure.placeholder = "Medida (xícara, g...)";
+        measure.placeholder = "g, xícara...";
+        measure.setAttribute("aria-label", "Medida");
         measure.value = data.medida || "";
         measure.required = true;
         const portions = document.createElement("select");
@@ -365,6 +500,7 @@ function appendMealEditor(container, initialMeal) {
         calories.step = "1";
         calories.value = data.calorias || 0;
         calories.required = true;
+        calories.setAttribute("aria-label", "Calorias (kcal)");
         const nutritionSummary = createElement("p", "food-nutrition-summary item-meta");
         nutritionSummary.setAttribute("aria-live", "polite");
 
@@ -404,8 +540,9 @@ function appendMealEditor(container, initialMeal) {
                     result.addEventListener("click", () => {
                         selectCatalogFood(row, food);
                         results.replaceChildren();
-                        searchStatus.textContent =
-                            "Alimento selecionado. Valores nutricionais calculados por gramas.";
+                        searchStatus.textContent = "";
+                        searchPanel.hidden = true;
+                        row.dispatchEvent(new Event("input", { bubbles: true }));
                     });
                     results.append(result);
                 });
@@ -450,18 +587,35 @@ function appendMealEditor(container, initialMeal) {
             row.dataset.foodCategory = data.categoria || "";
             row.dataset.portion = data.porcao || "";
         }
-        row.append(
-            inputGroup("Alimento (busca no catálogo ou entrada manual)", foodName),
-            searchPanel,
-            inputGroup("Porção do catálogo", portions),
-            inputGroup("Quantidade (em gramas para alimentos do catálogo)", quantity),
-            inputGroup("Medida (seleções do catálogo usam gramas)", measure),
-            inputGroup("Calorias (kcal)", calories),
-            nutritionSummary,
-        );
+        const nameField = createElement("div", "food-row__name");
+        searchPanel.classList.add("food-row__dropdown");
+        searchPanel.hidden = true;
+        nameField.append(foodName, searchPanel);
+        portions.setAttribute("aria-label", "Porção do catálogo");
+        const details = createElement("div", "food-row__details");
+        details.append(portions, nutritionSummary);
+        row.append(nameField, quantity, measure, calories, details);
+
+        const showDropdown = () => {
+            searchPanel.hidden = false;
+        };
+        foodName.addEventListener("focus", showDropdown);
+        foodName.addEventListener("input", showDropdown);
+        nameField.addEventListener("focusout", (event) => {
+            if (!nameField.contains(event.relatedTarget)) {
+                window.setTimeout(() => {
+                    if (!nameField.contains(document.activeElement)) searchPanel.hidden = true;
+                }, 150);
+            }
+        });
+        foodName.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") searchPanel.hidden = true;
+        });
         if (data.alimento_id) {
             api.obterAlimento(data.alimento_id).then((food) => {
-                if (row.isConnected) selectCatalogFood(row, food, data);
+                if (!row.isConnected) return;
+                selectCatalogFood(row, food, data);
+                row.dispatchEvent(new Event("input", { bubbles: true }));
             }).catch((error) => {
                 if (row.isConnected) {
                     searchStatus.textContent =
@@ -469,44 +623,122 @@ function appendMealEditor(container, initialMeal) {
                 }
             });
         }
-        const remove = createElement("button", "btn btn--ghost", "Remover opção");
+        const remove = createElement("button", "food-row__remove", "✕");
         remove.type = "button";
+        remove.title = removeLabel;
+        remove.setAttribute("aria-label", removeLabel);
         remove.addEventListener("click", () => {
-            if (foods.children.length > 1) row.remove();
+            onRemove(row);
+            card.dispatchEvent(new Event("input"));
         });
-        row.append(remove);
-        foods.append(row);
+        row.insertBefore(remove, row.querySelector(".food-row__details"));
+        return row;
     }
 
-    const addFood = createElement("button", "btn btn--ghost", "Adicionar opção de substituição");
+    function addFoodItem(item) {
+        const wrapper = createElement("div", "meal-food-item");
+        const substitutes = createElement("div", "food-substitutes");
+        const addSubstitute = (data) => {
+            const row = buildFoodRow(data, "Remover substituição", (target) => target.remove());
+            row.classList.add("food-option-row--substitute");
+            substitutes.append(row);
+        };
+        const main = buildFoodRow(item, "Remover alimento", () => {
+            if (foods.children.length > 1) {
+                wrapper.remove();
+            } else {
+                showDashboardError("A refeição precisa ter pelo menos um alimento.");
+            }
+        });
+        main.classList.add("food-option-row--main");
+        const addSubstituteButton = createElement("button", "food-substitutes__add", "+ substituição");
+        addSubstituteButton.type = "button";
+        addSubstituteButton.addEventListener("click", () => addSubstitute());
+        wrapper.append(main, substitutes, addSubstituteButton);
+        ((item && item.substituicoes) || []).forEach(addSubstitute);
+        foods.append(wrapper);
+    }
+
+    const addFood = createElement("button", "btn btn--ghost meal-editor__add-food", "+ Adicionar alimento");
     addFood.type = "button";
-    addFood.addEventListener("click", () => addFoodOption());
-    const removeMeal = createElement("button", "btn btn--ghost", "Remover refeição");
+    addFood.addEventListener("click", () => addFoodItem());
+    const removeMeal = createElement("button", "btn meal-editor__remove", "Excluir refeição");
     removeMeal.type = "button";
     removeMeal.addEventListener("click", () => {
-        if (container.children.length > 1) card.remove();
+        if (container.children.length <= 1) {
+            showDashboardError("O plano precisa ter pelo menos uma refeição.");
+            return;
+        }
+        const nomeRefeicao = name.value.trim();
+        const descricao = nomeRefeicao ? `a refeição "${nomeRefeicao}"` : "esta refeição";
+        if (!window.confirm(`Excluir ${descricao} do plano?`)) return;
+        card.remove();
+        showDashboardSuccess(nomeRefeicao
+            ? `Refeição "${nomeRefeicao}" excluída. Salve o plano para confirmar.`
+            : "Refeição excluída. Salve o plano para confirmar.");
     });
     name.addEventListener("input", () => {
         legend.textContent = name.value || "Nova refeição";
     });
-    card.append(
-        legend,
-        inputGroup("Horário", hour),
-        inputGroup("Nome da refeição", name),
-        foods,
-        addFood,
-        removeMeal,
-    );
-    (meal.opcoes || []).forEach(addFoodOption);
-    if (!meal.opcoes || meal.opcoes.length === 0) addFoodOption();
+    name.placeholder = "Ex.: Café da manhã";
+    const total = createElement("span", "meal-editor__total", "0 kcal");
+    const toggle = createElement("button", "panel-toggle");
+    toggle.type = "button";
+    toggle.setAttribute("aria-expanded", "true");
+    toggle.setAttribute("aria-label", "Esconder refeição");
+    toggle.addEventListener("click", () => {
+        const recolhida = card.classList.toggle("is-collapsed");
+        toggle.setAttribute("aria-expanded", String(!recolhida));
+        toggle.setAttribute("aria-label", recolhida ? "Mostrar refeição" : "Esconder refeição");
+    });
+    const head = createElement("div", "meal-editor__head");
+    head.append(inputGroup("Refeição", name), inputGroup("Horário", hour), total, toggle);
+    const columns = createElement("div", "food-columns");
+    ["Alimento", "Qtd.", "Medida", "kcal", ""].forEach((titulo) => columns.append(createElement("span", "", titulo)));
+    const body = createElement("div", "meal-editor__body");
+    const actions = createElement("div", "meal-editor__actions");
+    actions.append(addFood, removeMeal);
+    body.append(columns, foods, actions);
+    const updateTotal = () => {
+        const kcal = [...card.querySelectorAll(".food-option-row--main [name='calorias']")]
+            .reduce((soma, campo) => soma + (Number(campo.value) || 0), 0);
+        total.textContent = `${kcal} kcal`;
+    };
+    card.addEventListener("input", updateTotal);
+    card.addEventListener("change", updateTotal);
+    card.append(legend, head, body);
+    const mealFoods = alimentosDaRefeicao(meal);
+    mealFoods.forEach(addFoodItem);
+    if (mealFoods.length === 0) addFoodItem();
+    updateTotal();
     container.append(card);
+}
+
+document.addEventListener("mousedown", (event) => {
+    document.querySelectorAll(".food-row__dropdown:not([hidden])").forEach((dropdown) => {
+        if (!dropdown.parentElement.contains(event.target)) dropdown.hidden = true;
+    });
+});
+
+function alimentosDaRefeicao(meal) {
+    if (meal.alimentos) return meal.alimentos;
+    if (!meal.opcoes || meal.opcoes.length === 0) return [];
+    const [principal, ...substituicoes] = meal.opcoes;
+    return [{ ...principal, substituicoes }];
 }
 
 function collectMeals(container) {
     return [...container.querySelectorAll(".meal-editor")].map((card) => ({
         horario: card.querySelector('[name="horario"]').value,
         nome: card.querySelector('[name="nome"]').value,
-        opcoes: [...card.querySelectorAll(".food-option-row")].map((row) => {
+        alimentos: [...card.querySelectorAll(".meal-food-item")].map((item) => ({
+            ...readFoodRow(item.querySelector(".food-option-row--main")),
+            substituicoes: [...item.querySelectorAll(".food-option-row--substitute")].map(readFoodRow),
+        })),
+    }));
+}
+
+function readFoodRow(row) {
             const option = {
                 nome: row.querySelector('[name="alimento"]').value,
                 quantidade: Number(row.querySelector('[name="quantidade"]').value),
@@ -526,8 +758,6 @@ function collectMeals(container) {
                     });
             }
             return option;
-        }),
-    }));
 }
 
 const MEAL_TEMPLATES = {
@@ -602,7 +832,7 @@ function createMealTemplateControls(mealContainer, objectiveInput) {
         if (objectiveInput) objectiveInput.value = objectives[select.value];
         mealContainer.replaceChildren();
         template.forEach(([horario, nome]) => {
-            appendMealEditor(mealContainer, { horario, nome, opcoes: [] });
+            appendMealEditor(mealContainer, { horario, nome, alimentos: [] });
         });
     });
     const note = createElement(
@@ -616,6 +846,160 @@ function createMealTemplateControls(mealContainer, objectiveInput) {
         note,
     );
     return controls;
+}
+
+let html2pdfPromise;
+
+function carregarGeradorPdf() {
+    if (window.html2pdf) return Promise.resolve(window.html2pdf);
+    if (!html2pdfPromise) {
+        html2pdfPromise = new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = "https://cdn.jsdelivr.net/npm/html2pdf.js@0.14.0/dist/html2pdf.bundle.min.js";
+            script.onload = () => resolve(window.html2pdf);
+            script.onerror = () => {
+                html2pdfPromise = null;
+                reject(new Error("Não foi possível carregar o gerador de PDF."));
+            };
+            document.head.append(script);
+        });
+    }
+    return html2pdfPromise;
+}
+
+function montarPlanoPdf(plan, nutricionista) {
+    const logo = document.querySelector(".brand-logo")?.src
+        || new URL("../assets/images/NutriLife-logo-semfundo.png", window.location.href).href;
+    const emitidoEm = new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(new Date());
+    const refeicoes = plan.refeicoes.map((meal) => ({ ...meal, alimentos: alimentosDaRefeicao(meal) }));
+    const kcalDaRefeicao = (meal) => meal.alimentos.reduce((total, food) => total + (Number(food.calorias) || 0), 0);
+    const kcalDia = refeicoes.reduce((total, meal) => total + kcalDaRefeicao(meal), 0);
+    const quantidade = (food) => `${Number(food.quantidade).toLocaleString("pt-BR")} ${food.medida}`;
+
+    const pagina = createElement("div", "pdf-plano");
+
+    const cabecalho = createElement("header", "pdf-header");
+    const imagem = document.createElement("img");
+    imagem.src = logo;
+    imagem.alt = "NutriLife";
+    imagem.className = "pdf-logo";
+    const titulo = createElement("div", "pdf-header__title");
+    titulo.append(
+        createElement("span", "pdf-eyebrow", "Plano alimentar"),
+        createElement("h1", "", plan.paciente_nome || plan.titulo),
+    );
+    cabecalho.append(imagem, titulo, createElement("span", "pdf-header__date", `Emitido em ${emitidoEm}`));
+
+    const cards = createElement("section", "pdf-cards");
+    const crn = nutricionista?.crn ? formatarCrn(nutricionista.crn) : "";
+    [
+        ["Nutricionista", plan.nutricionista_nome, crn],
+        ["Meta", plan.objetivo || "Não definida", ""],
+        ["Duração", `${plan.duracao_meses} ${plan.duracao_meses === 1 ? "mês" : "meses"}`, ""],
+        ["Total diário", `${kcalDia.toLocaleString("pt-BR")} kcal`, `${refeicoes.length} refeições`],
+    ].forEach(([rotulo, valor, detalhe]) => {
+        const card = createElement("div", "pdf-card");
+        card.append(createElement("span", "pdf-card__label", rotulo), createElement("strong", "", valor));
+        if (detalhe) card.append(createElement("span", "pdf-card__detail", detalhe));
+        cards.append(card);
+    });
+
+    const orientacoes = createElement("section", "pdf-orientacoes");
+    orientacoes.append(createElement("h2", "", "Orientações"), createElement("p", "", plan.descricao));
+
+    const listaRefeicoes = createElement("section", "pdf-refeicoes");
+    listaRefeicoes.append(createElement("h2", "", "Refeições"));
+    refeicoes.forEach((meal) => {
+        const bloco = createElement("article", "pdf-refeicao");
+        const topo = createElement("div", "pdf-refeicao__head");
+        topo.append(
+            createElement("span", "pdf-refeicao__hora", meal.horario),
+            createElement("h3", "", meal.nome),
+            createElement("span", "pdf-refeicao__kcal", `${kcalDaRefeicao(meal).toLocaleString("pt-BR")} kcal`),
+        );
+        const tabela = createElement("table", "pdf-tabela");
+        const cabecalhoTabela = createElement("thead");
+        const linhaTitulos = createElement("tr");
+        ["Alimento", "Quantidade", "kcal"].forEach((texto) => linhaTitulos.append(createElement("th", "", texto)));
+        cabecalhoTabela.append(linhaTitulos);
+        const corpo = createElement("tbody");
+        meal.alimentos.forEach((food) => {
+            const linha = createElement("tr");
+            linha.append(
+                createElement("td", "", food.nome),
+                createElement("td", "", quantidade(food)),
+                createElement("td", "", String(food.calorias)),
+            );
+            corpo.append(linha);
+            (food.substituicoes || []).forEach((sub) => {
+                const linhaSub = createElement("tr", "pdf-tabela__sub");
+                linhaSub.append(
+                    createElement("td", "", `ou ${sub.nome}`),
+                    createElement("td", "", quantidade(sub)),
+                    createElement("td", "", String(sub.calorias)),
+                );
+                corpo.append(linhaSub);
+            });
+        });
+        tabela.append(cabecalhoTabela, corpo);
+        bloco.append(topo, tabela);
+        listaRefeicoes.append(bloco);
+    });
+
+    const rodape = createElement(
+        "footer",
+        "pdf-footer",
+        `Plano elaborado por ${plan.nutricionista_nome}${crn ? ` (${crn})` : ""} · NutriLife — cuidado nutricional de forma simples, organizada e próxima.`,
+    );
+
+    pagina.append(cabecalho, cards, orientacoes, listaRefeicoes, rodape);
+    return pagina;
+}
+
+async function baixarPlanoPdf(plan) {
+    const [html2pdf, nutricionista] = await Promise.all([
+        carregarGeradorPdf(),
+        api.obterNutricionista(plan.nutricionista_id).catch(() => null),
+    ]);
+    const pagina = montarPlanoPdf(plan, nutricionista);
+    const area = createElement("div", "pdf-area");
+    area.append(pagina);
+    document.body.append(area);
+    try {
+        await Promise.all([...pagina.querySelectorAll("img")].map((img) => img.decode().catch(() => {})));
+        const nomeArquivo = (plan.paciente_nome || plan.titulo || "plano")
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+        await html2pdf()
+            .set({
+                margin: [10, 10, 14, 10],
+                filename: `plano-alimentar-${nomeArquivo}.pdf`,
+                image: { type: "jpeg", quality: 0.96 },
+                html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+                jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+                pagebreak: { mode: ["css", "legacy"], avoid: [".pdf-refeicao", ".pdf-cards", ".pdf-header"] },
+            })
+            .from(pagina)
+            .toPdf()
+            .get("pdf")
+            .then((pdf) => {
+                const total = pdf.internal.getNumberOfPages();
+                for (let numero = 1; numero <= total; numero += 1) {
+                    pdf.setPage(numero);
+                    pdf.setFontSize(8);
+                    pdf.setTextColor(51, 102, 51);
+                    pdf.text(
+                        `NutriLife · Página ${numero} de ${total}`,
+                        pdf.internal.pageSize.getWidth() / 2,
+                        pdf.internal.pageSize.getHeight() - 6,
+                        { align: "center" },
+                    );
+                }
+            })
+            .save();
+    } finally {
+        area.remove();
+    }
 }
 
 function renderPlans(plans) {
@@ -651,21 +1035,48 @@ function renderPlans(plans) {
             section.append(
                 createElement("h5", "", `${meal.horario} · ${meal.nome}`),
             );
-            const options = document.createElement("ul");
-            meal.opcoes.forEach((option) => {
+            const descreverAlimento = (option) => {
                 const nutrition = option.alimento_id
                     ? ` · Proteína ${nutrientText(option.proteina_g, "g")}, carboidratos ${nutrientText(option.carboidrato_g, "g")}, gorduras ${nutrientText(option.gordura_g, "g")}`
                     : "";
-                options.append(createElement(
-                    "li",
-                    "",
-                    `${option.nome} — ${option.quantidade} ${option.medida} · ${option.calorias} kcal${nutrition}`,
-                ));
+                return `${option.nome} — ${option.quantidade} ${option.medida} · ${option.calorias} kcal${nutrition}`;
+            };
+            const alimentos = alimentosDaRefeicao(meal);
+            const totalKcal = alimentos.reduce((total, food) => total + (Number(food.calorias) || 0), 0);
+            section.querySelector("h5").textContent += ` · ${totalKcal} kcal`;
+            const options = createElement("ul", "plan-meal__foods");
+            alimentos.forEach((food) => {
+                const item = createElement("li", "", descreverAlimento(food));
+                if (food.substituicoes && food.substituicoes.length) {
+                    const substitutes = createElement("ul", "plan-meal__substitutes");
+                    food.substituicoes.forEach((substitute) => {
+                        substitutes.append(createElement("li", "", `ou ${descreverAlimento(substitute)}`));
+                    });
+                    item.append(substitutes);
+                }
+                options.append(item);
             });
             section.append(options);
             meals.append(section);
         });
         article.append(meals);
+
+        const download = createElement("button", "btn btn--primary plan-download", "Baixar plano em PDF");
+        download.type = "button";
+        download.addEventListener("click", async () => {
+            download.disabled = true;
+            download.textContent = "Gerando PDF...";
+            try {
+                await baixarPlanoPdf(plan);
+                showDashboardSuccess("PDF do plano alimentar baixado.");
+            } catch {
+                showDashboardError("Não foi possível gerar o PDF. Verifique sua conexão e tente novamente.");
+            } finally {
+                download.disabled = false;
+                download.textContent = "Baixar plano em PDF";
+            }
+        });
+        article.append(download);
 
         const currentUser = JSON.parse(sessionStorage.getItem(USER_KEY) || "{}");
         if (currentUser.perfil === "nutricionista") {
@@ -744,6 +1155,7 @@ function renderPlans(plans) {
                         refeicoes: collectMeals(mealsInput),
                     });
                     await loadCurrentPage();
+                    showDashboardSuccess("Plano atualizado com sucesso.");
                 } catch (error) {
                     showDashboardError(error.message);
                 } finally {
@@ -757,6 +1169,7 @@ function renderPlans(plans) {
                 try {
                     await api.excluirPlano(plan.id);
                     await loadCurrentPage();
+                    showDashboardSuccess("Plano excluído.");
                 } catch (error) {
                     showDashboardError(error.message);
                 }
@@ -915,6 +1328,7 @@ function renderAdminUsers(users) {
                 try {
                     await api.excluirUsuarioAdministrador(user.id);
                     await loadAdminUsersPage();
+                    showDashboardSuccess("Usuário excluído.");
                 } catch (error) {
                     showDashboardError(error.message);
                     remove.disabled = false;
@@ -972,21 +1386,16 @@ async function loadAdminUsersPage() {
 }
 
 function showDashboardError(message) {
-    const status = document.getElementById("dashboard-status");
-    if (status) {
-        status.textContent = message;
-        status.hidden = false;
-        status.classList.remove("is-success");
-    }
+    mostrarToast(message || "Não foi possível concluir a ação.", "erro");
 }
 
 function showDashboardSuccess(message) {
-    const status = document.getElementById("dashboard-status");
-    if (status) {
-        status.textContent = message;
-        status.hidden = false;
-        status.classList.add("is-success");
-    }
+    mostrarToast(message, "sucesso");
+}
+
+function formatarCrn(crn) {
+    if (!crn) return "CRN não informado";
+    return /^crn/i.test(crn) ? crn : `CRN ${crn}`;
 }
 
 function formatDateTime(value) {
@@ -1018,20 +1427,31 @@ async function loadSearchPage(user) {
     }
     const results = document.getElementById("nutritionists-list");
 
-    async function search(state) {
+    async function search(state, radius) {
         results.replaceChildren(createElement("p", "item-meta", "Buscando profissionais..."));
         try {
-            const professionals = await api.listarNutricionistas(state);
+            let professionals;
+            try {
+                professionals = await api.listarNutricionistasProximos({ estado: state, raioKm: radius });
+            } catch (error) {
+                if (error.status !== 422 || radius) throw error;
+                professionals = await api.listarNutricionistas(state);
+            }
             results.replaceChildren();
             if (!professionals.length) {
-                results.append(createElement("p", "item-meta", "Nenhum profissional encontrado para esse estado."));
+                results.append(createElement("p", "item-meta", radius
+                    ? `Nenhum profissional encontrado em até ${radius} km.`
+                    : "Nenhum profissional encontrado para esse estado."));
                 return;
             }
             professionals.forEach((professional) => {
                 const card = createElement("article", "panel professional-card");
+                if (professional.distancia_km != null) {
+                    card.append(createElement("span", "professional-distance", `${professional.distancia_km.toLocaleString("pt-BR")} km de você`));
+                }
                 card.append(
                     createElement("h2", "", professional.nome),
-                    createElement("p", "item-meta", `CRN ${professional.crn || "não informado"} · ${professional.estado}`),
+                    createElement("p", "item-meta", `${formatarCrn(professional.crn)} · ${professional.estado}`),
                     createElement("p", "", professional.especialidades.join(" · ") || "Especialidades não informadas"),
                     createElement("p", "professional-price", new Intl.NumberFormat("pt-BR", {
                         style: "currency",
@@ -1051,9 +1471,12 @@ async function loadSearchPage(user) {
 
     document.getElementById("search-form").addEventListener("submit", (event) => {
         event.preventDefault();
-        search(document.getElementById("state-filter").value);
+        search(
+            document.getElementById("state-filter").value,
+            document.getElementById("distance-filter")?.value || "",
+        );
     });
-    await search("");
+    await search("", "");
 }
 
 async function loadPatientHomePage(user) {
@@ -1082,20 +1505,28 @@ async function loadProfessionalProfile(user) {
         return;
     }
     const professional = await api.obterNutricionista(id);
-    container.replaceChildren(
-        createElement("span", "eyebrow", "Perfil profissional"),
+    const iniciais = professional.nome.split(" ").slice(0, 2).map((parte) => parte[0]).join("").toUpperCase();
+    const preco = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(professional.valor_consulta);
+    const desde = new Intl.DateTimeFormat("pt-BR", { month: "short", year: "numeric" })
+        .format(new Date(`${professional.data_inicio}T12:00:00`));
+
+    const hero = createElement("section", "pro-hero");
+    const info = createElement("div", "pro-hero__info");
+    info.append(
+        createElement("span", "eyebrow", `${formatarCrn(professional.crn)}`),
         createElement("h1", "", professional.nome),
-        createElement("p", "item-meta", `CRN ${professional.crn || "não informado"} · ${professional.estado}`),
-        createElement("h3", "", "Especialidades"),
-        createElement("p", "", professional.especialidades.join(" · ") || "Não informadas"),
-        createElement("h3", "", "Sobre"),
-        createElement("p", "", professional.biografia || "Este profissional ainda não adicionou uma biografia."),
-        createElement("p", "item-meta", `Nota média: ${professional.nota_media.toFixed(1)} · Pacientes atendidos: ${professional.total_pacientes} · Na plataforma desde ${professional.data_inicio}`),
-        createElement("p", "professional-price", new Intl.NumberFormat("pt-BR", {
-            style: "currency",
-            currency: "BRL",
-        }).format(professional.valor_consulta)),
+        createElement("p", "pro-hero__specialty", professional.especialidades[0] || "Nutricionista"),
     );
+    const tags = createElement("div", "pro-tags");
+    tags.append(createElement("span", "pro-tag", professional.estado));
+    info.append(tags);
+
+    const cta = createElement("div", "pro-hero__cta");
+    const price = createElement("span", "pro-hero__price", "Consulta");
+    price.append(createElement("strong", "", preco));
+    const schedule = createElement("a", "btn btn--primary", "Marcar consulta");
+    schedule.href = `./agendamento.html?id=${encodeURIComponent(professional.id)}`;
+    cta.append(price, schedule);
     if (professional.telefone) {
         const phone = professional.telefone.startsWith("55")
             ? professional.telefone
@@ -1104,11 +1535,225 @@ async function loadProfessionalProfile(user) {
         whatsapp.href = `https://wa.me/${phone}`;
         whatsapp.target = "_blank";
         whatsapp.rel = "noopener noreferrer";
-        container.append(whatsapp);
+        cta.append(whatsapp);
     }
-    const schedule = createElement("a", "btn btn--primary", "Marcar consulta");
-    schedule.href = `./agendamento.html?id=${encodeURIComponent(professional.id)}`;
-    container.append(schedule);
+    hero.append(createElement("span", "pro-hero__avatar", iniciais), info, cta);
+
+    const stats = createElement("section", "pro-stats");
+    [
+        [professional.nota_media ? `${professional.nota_media.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} / 5` : "—", professional.nota_media ? "nota média" : "ainda sem avaliações"],
+        [String(professional.total_pacientes), "pacientes atendidos"],
+        [desde.replace(" de ", "/").replace(".", ""), "no NutriLife desde"],
+    ].forEach(([valor, rotulo]) => {
+        const stat = createElement("article", "pro-stat");
+        stat.append(createElement("span", "pro-stat__value", valor), createElement("span", "pro-stat__label", rotulo));
+        stats.append(stat);
+    });
+
+    const about = createElement("section", "pro-section");
+    about.append(
+        createElement("h2", "", "Sobre"),
+        createElement("p", "pro-bio", professional.biografia || "Este profissional ainda não adicionou uma biografia."),
+        createElement("h3", "", "Especialidades"),
+    );
+    const specialties = createElement("div", "pro-tags");
+    (professional.especialidades.length ? professional.especialidades : ["Não informadas"])
+        .forEach((nome) => specialties.append(createElement("span", "pro-tag pro-tag--outline", nome)));
+    about.append(specialties);
+
+    const back = createElement("a", "pro-back", "← Voltar para nutricionistas");
+    back.href = "./busca.html";
+    const reviews = createElement("section", "pro-section pro-reviews");
+    const reviewsHead = createElement("div", "pro-reviews__head");
+    reviewsHead.append(createElement("h2", "", "Avaliações"), createElement("span", "pro-reviews__count", ""));
+    reviews.append(
+        reviewsHead,
+        createElement("div", "review-form-area"),
+        createElement("ul", "reviews"),
+    );
+
+    container.replaceChildren(back, hero, stats, about, reviews);
+    await carregarComentariosDoPerfil(professional, reviews);
+}
+
+function estrelasTexto(nota) {
+    return "★".repeat(nota) + "☆".repeat(5 - nota);
+}
+
+function formatarDataComentario(valor) {
+    return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(valor));
+}
+
+function criarCardComentario(comentario, nomeNutricionista, aoResponder) {
+    const item = createElement("li", "review");
+    const avatar = createElement("span", "review__avatar", comentario.anonimo ? "?" : comentario.autor.charAt(0).toUpperCase());
+    avatar.setAttribute("aria-hidden", "true");
+    const corpo = createElement("div", "review__body");
+    const cabecalho = createElement("div", "review__head");
+    const estrelas = createElement("span", "review__stars", estrelasTexto(comentario.nota));
+    estrelas.setAttribute("aria-label", `Nota ${comentario.nota} de 5`);
+    cabecalho.append(createElement("strong", "", comentario.autor), estrelas);
+    const data = createElement("time", "review__date", formatarDataComentario(comentario.criado_em));
+    data.dateTime = comentario.criado_em;
+    corpo.append(cabecalho, createElement("p", "", comentario.comentario), data);
+
+    if (comentario.resposta) {
+        const resposta = createElement("div", "review__reply");
+        const rotulo = createElement("span", "review__reply-label", "Resposta de ");
+        rotulo.append(createElement("strong", "", nomeNutricionista));
+        const dataResposta = createElement("time", "review__date", formatarDataComentario(comentario.resposta.respondido_em));
+        resposta.append(rotulo, createElement("p", "", comentario.resposta.texto), dataResposta);
+        corpo.append(resposta);
+    }
+
+    if (aoResponder) {
+        const form = createElement("form", "review-reply-form");
+        const campo = document.createElement("textarea");
+        campo.name = "texto";
+        campo.required = true;
+        campo.minLength = 2;
+        campo.maxLength = 1000;
+        campo.rows = 2;
+        campo.placeholder = "Escreva sua resposta ao paciente";
+        campo.value = comentario.resposta?.texto || "";
+        const botao = createElement("button", "btn btn--primary", comentario.resposta ? "Atualizar resposta" : "Responder");
+        botao.type = "submit";
+        form.append(campo, botao);
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            botao.disabled = true;
+            try {
+                await aoResponder(comentario.id, campo.value);
+            } catch (error) {
+                showDashboardError(error.message || "Não foi possível salvar a resposta.");
+                botao.disabled = false;
+            }
+        });
+        corpo.append(form);
+    }
+
+    item.append(avatar, corpo);
+    return item;
+}
+
+function criarFormularioComentario(comentarioAtual, aoSalvar) {
+    const form = createElement("form", "review-form panel");
+    form.id = "review-form";
+    form.dataset.collapsible = "";
+    const cabecalho = createElement("div", "panel__head");
+    const titulo = comentarioAtual ? "Editar seu comentário" : "Deixe seu comentário";
+    const alternar = createElement("button", "panel-toggle");
+    alternar.type = "button";
+    cabecalho.append(createElement("h3", "", titulo), alternar);
+    form.append(cabecalho);
+
+    const seletor = createElement("div", "star-input");
+    seletor.setAttribute("role", "radiogroup");
+    seletor.setAttribute("aria-label", "Nota de 1 a 5 estrelas");
+    let nota = comentarioAtual?.nota || 0;
+    const botoes = [1, 2, 3, 4, 5].map((valor) => {
+        const estrela = createElement("button", "star-input__star", "★");
+        estrela.type = "button";
+        estrela.setAttribute("role", "radio");
+        estrela.setAttribute("aria-label", `${valor} ${valor === 1 ? "estrela" : "estrelas"}`);
+        estrela.addEventListener("click", () => {
+            nota = valor;
+            atualizarEstrelas();
+        });
+        seletor.append(estrela);
+        return estrela;
+    });
+    const atualizarEstrelas = () => botoes.forEach((estrela, i) => {
+        estrela.classList.toggle("is-active", i < nota);
+        estrela.setAttribute("aria-checked", String(i + 1 === nota));
+    });
+    atualizarEstrelas();
+
+    const campo = document.createElement("textarea");
+    campo.name = "comentario";
+    campo.required = true;
+    campo.minLength = 3;
+    campo.maxLength = 1000;
+    campo.rows = 4;
+    campo.placeholder = "Conte como foi seu acompanhamento";
+    campo.value = comentarioAtual?.comentario || "";
+
+    const anonimo = createElement("label", "review-form__anonymous");
+    const caixa = document.createElement("input");
+    caixa.type = "checkbox";
+    caixa.checked = Boolean(comentarioAtual?.anonimo);
+    anonimo.append(caixa, document.createTextNode(" Publicar como anônimo"));
+
+    const status = createElement("p", "auth-status", "");
+    const botao = createElement("button", "btn btn--primary", comentarioAtual ? "Atualizar comentário" : "Publicar comentário");
+    botao.type = "submit";
+    form.append(seletor, campo, anonimo, botao, status);
+    configurarCardRecolhivel(form, Boolean(comentarioAtual));
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!nota) {
+            setStatus(status, "Escolha uma nota de 1 a 5 estrelas.", "error");
+            return;
+        }
+        botao.disabled = true;
+        try {
+            await aoSalvar({ nota, comentario: campo.value, anonimo: caixa.checked });
+        } catch (error) {
+            setStatus(status, error.message || "Não foi possível salvar o comentário.", "error");
+            botao.disabled = false;
+        }
+    });
+    return form;
+}
+
+async function carregarComentariosDoPerfil(professional, secao) {
+    const lista = secao.querySelector(".reviews");
+    const areaFormulario = secao.querySelector(".review-form-area");
+    const contador = secao.querySelector(".pro-reviews__count");
+
+    const [comentarios, meu] = await Promise.all([
+        api.listarComentarios(professional.id),
+        api.meuComentario(professional.id).catch(() => ({ pode_comentar: false, comentario: null })),
+    ]);
+
+    contador.textContent = comentarios.length === 1 ? "1 avaliação" : `${comentarios.length} avaliações`;
+    lista.replaceChildren(...comentarios.map((comentario) => criarCardComentario(comentario, professional.nome)));
+    if (!comentarios.length) {
+        lista.append(createElement("li", "reviews-empty", "Este nutricionista ainda não recebeu avaliações."));
+    }
+
+    if (meu.pode_comentar) {
+        areaFormulario.replaceChildren(criarFormularioComentario(meu.comentario, async (dados) => {
+            await api.salvarComentario(professional.id, dados);
+            await carregarComentariosDoPerfil(professional, secao);
+            showDashboardSuccess(meu.comentario ? "Comentário atualizado." : "Comentário publicado.");
+        }));
+    } else {
+        areaFormulario.replaceChildren(createElement(
+            "p",
+            "item-meta review-form-hint",
+            "Você poderá avaliar este nutricionista depois de receber um plano alimentar ou ter uma consulta com ele.",
+        ));
+    }
+}
+
+async function carregarComentariosRecebidos(nomeNutricionista) {
+    const lista = document.getElementById("received-reviews");
+    if (!lista) return;
+    const comentarios = await api.comentariosRecebidos();
+    lista.replaceChildren(...comentarios.map((comentario) => criarCardComentario(
+        comentario,
+        nomeNutricionista,
+        async (comentarioId, texto) => {
+            await api.responderComentario(comentarioId, texto);
+            await carregarComentariosRecebidos(nomeNutricionista);
+            showDashboardSuccess("Resposta enviada.");
+        },
+    )));
+    if (!comentarios.length) {
+        lista.append(createElement("li", "reviews-empty", "Você ainda não recebeu comentários de pacientes."));
+    }
 }
 
 function firstOfMonth(date) {
@@ -1223,6 +1868,7 @@ async function loadBookingPage(user) {
                                 ? "Horário reservado. A consulta aguarda a confirmação manual do pagamento."
                                 : "Horário solicitado. Aguarde a confirmação da nutricionista.";
                             slotsContainer.replaceChildren(createElement("p", "item-meta", message));
+                            showDashboardSuccess(message);
                             if (appointment.link_pagamento) {
                                 const payment = createElement("a", "btn btn--primary", "Ir para pagamento PagSeguro");
                                 payment.href = appointment.link_pagamento;
@@ -1360,10 +2006,10 @@ function createAssessmentEditor(appointment, user, savedAssessment) {
             : null;
         try {
             await api.salvarAvaliacaoConsulta(appointment.id, payload);
-            status.textContent = "Avaliação salva e vinculada a este paciente.";
             await loadAppointmentsPage(user);
+            showDashboardSuccess("Avaliação salva e vinculada a este paciente.");
         } catch (error) {
-            status.textContent = error.message || "Não foi possível salvar a avaliação.";
+            showDashboardError(error.message || "Não foi possível salvar a avaliação.");
             submit.disabled = false;
         }
     });
@@ -1466,6 +2112,7 @@ async function loadAppointmentsPage(user) {
                 try {
                     await api.confirmarConsulta(appointment.id);
                     await loadAppointmentsPage(user);
+                    showDashboardSuccess("Consulta confirmada.");
                 } catch (error) {
                     showDashboardError(error.message);
                     confirm.disabled = false;
@@ -1481,6 +2128,7 @@ async function loadAppointmentsPage(user) {
                 try {
                     await api.cancelarConsulta(appointment.id);
                     await loadAppointmentsPage(user);
+                    showDashboardSuccess("Consulta cancelada.");
                 } catch (error) {
                     showDashboardError(error.message);
                 }
@@ -1731,7 +2379,7 @@ async function loadProfessionalCalendarPage() {
                 fuso_horario: document.getElementById("timezone").value,
                 horarios: getAvailabilityDraft(),
             });
-            showDashboardError("Disponibilidade salva.");
+            showDashboardSuccess("Disponibilidade salva.");
         } catch (error) {
             showDashboardError(error.message);
         } finally {
@@ -1780,6 +2428,7 @@ function initPageHandlers() {
                 mealEditor.replaceChildren();
                 appendMealEditor(mealEditor);
                 await loadCurrentPage();
+                showDashboardSuccess("Plano criado com sucesso.");
             } catch (error) {
                 showDashboardError(error.message);
             }
@@ -1802,12 +2451,31 @@ function initPageHandlers() {
                     valor_consulta: Number(values.valor_consulta),
                     pagseguro_link: values.pagseguro_link || null,
                 });
-                showDashboardError("Perfil atualizado.");
+                showDashboardSuccess("Perfil atualizado.");
             } catch (error) {
                 showDashboardError(error.message);
             }
         });
     }
+}
+
+const MENU_POR_PERFIL = {
+    "overview-nav": ["nutricionista", "administrador"],
+    "patient-home-nav": ["paciente"],
+    "search-nav": ["paciente"],
+    "patients-nav": ["nutricionista"],
+    "plans-nav": ["paciente", "nutricionista"],
+    "appointments-nav": ["paciente", "nutricionista"],
+    "availability-nav": ["nutricionista"],
+    "profile-nav": ["nutricionista"],
+    "admin-users-nav": ["administrador"],
+};
+
+function aplicarMenuPorPerfil(perfil) {
+    Object.entries(MENU_POR_PERFIL).forEach(([id, perfis]) => {
+        const link = document.getElementById(id);
+        if (link) link.hidden = !perfis.includes(perfil);
+    });
 }
 
 async function setCurrentUser() {
@@ -1823,25 +2491,13 @@ async function setCurrentUser() {
             paciente: "Paciente",
         }[user.perfil];
     }
-    const patientsNav = document.getElementById("patients-nav");
     const patientsAction = document.getElementById("patients-action");
-    if (patientsNav) patientsNav.hidden = user.perfil !== "nutricionista";
     if (patientsAction) patientsAction.hidden = user.perfil !== "nutricionista";
-    const adminLinks = ["admin-users-nav", "admin-users-action"];
-    adminLinks.forEach((id) => {
-        const link = document.getElementById(id);
-        if (link) link.hidden = user.perfil !== "administrador";
-    });
-    const nutritionistOnlyLinks = ["availability-nav", "profile-nav", "calendar-nav"];
-    nutritionistOnlyLinks.forEach((id) => {
-        const link = document.getElementById(id);
-        if (link) link.hidden = user.perfil !== "nutricionista";
-    });
-    const patientOnlyLinks = ["search-nav", "patient-home-nav", "patient-home-action"];
-    patientOnlyLinks.forEach((id) => {
-        const link = document.getElementById(id);
-        if (link) link.hidden = user.perfil !== "paciente";
-    });
+    const adminAction = document.getElementById("admin-users-action");
+    if (adminAction) adminAction.hidden = user.perfil !== "administrador";
+    const patientHomeAction = document.getElementById("patient-home-action");
+    if (patientHomeAction) patientHomeAction.hidden = user.perfil !== "paciente";
+    aplicarMenuPorPerfil(user.perfil);
     return user;
 }
 
@@ -1949,6 +2605,7 @@ async function loadCurrentPage() {
         form.elements.biografia.value = user.biografia;
         form.elements.valor_consulta.value = user.valor_consulta;
         form.elements.pagseguro_link.value = user.pagseguro_link || "";
+        await carregarComentariosRecebidos(user.nome);
         return;
     }
 }
@@ -1965,6 +2622,9 @@ function initProtectedPage() {
             window.location.href = loginUrl;
         });
     }
+
+    const usuarioSalvo = JSON.parse(sessionStorage.getItem(USER_KEY) || "null");
+    if (usuarioSalvo) aplicarMenuPorPerfil(usuarioSalvo.perfil);
 
     initPageHandlers();
 
@@ -1984,7 +2644,38 @@ function initProtectedPage() {
     });
 }
 
+function configurarCardRecolhivel(card, recolhidoPorPadrao = false) {
+    const botao = card.querySelector(".panel-toggle");
+    if (!botao) return;
+    const titulo = card.querySelector(".panel__head h3")?.textContent || "card";
+    const chave = `nutrilife_card_${card.id}`;
+    const aplicar = (recolhido) => {
+        card.classList.toggle("is-collapsed", recolhido);
+        botao.setAttribute("aria-expanded", String(!recolhido));
+        botao.setAttribute("aria-label", `${recolhido ? "Mostrar" : "Esconder"} ${titulo}`);
+    };
+    try {
+        const salvo = localStorage.getItem(chave);
+        aplicar(salvo === null ? recolhidoPorPadrao : salvo === "1");
+    } catch {
+        aplicar(recolhidoPorPadrao);
+    }
+    botao.addEventListener("click", () => {
+        const recolhido = !card.classList.contains("is-collapsed");
+        aplicar(recolhido);
+        try {
+            localStorage.setItem(chave, recolhido ? "1" : "0");
+        } catch {}
+    });
+}
+
+function configurarCardsRecolhiveis() {
+    document.querySelectorAll("[data-collapsible]").forEach((card) => configurarCardRecolhivel(card));
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+    configurarCardsRecolhiveis();
+    if (["auth", "password-reset"].includes(document.body.dataset.page)) adicionarOlhoSenha();
     if (document.body.dataset.page === "auth") initAuthPage();
     if (document.body.dataset.page === "password-reset") initPasswordResetPage();
     if (["dashboard", "plans", "patients", "search", "patient-home", "professional-profile", "booking", "appointments", "professional-calendar", "professional-profile-edit", "admin-users"].includes(document.body.dataset.page)) {

@@ -11,7 +11,7 @@ from crud import consulta_crud
 from crud import plano_crud
 from crud import usuario_crud
 from crud.usuario_crud import _serializar_profissional
-from routers import admin_router, alimento_router, auth_router, consulta_router, usuario_router
+from routers import admin_router, alimento_router, auth_router, comentario_router, consulta_router, usuario_router
 from schemas.consulta_schema import (
     ConsultaAvaliacaoUpdate,
     ConsultaConfirmar,
@@ -64,6 +64,7 @@ def test_register_creates_patient_and_never_returns_password(client, monkeypatch
         json={
             "nome": "Maria Souza",
             "email": "maria@example.com",
+            "cpf": "529.982.247-25",
             "telefone": "61988887777",
             "endereco": "Rua das Flores, 10",
             "cep": "70000000",
@@ -78,6 +79,121 @@ def test_register_creates_patient_and_never_returns_password(client, monkeypatch
     assert response.json()["usuario"]["perfil"] == "paciente"
     assert "senha" not in response.json()["usuario"]
     assert created_users[0][1] == "hashed"
+    assert created_users[0][0].cpf == "52998224725"
+
+
+@pytest.mark.parametrize("cpf", ["123.456.789-00", "111.111.111-11", "1234"])
+def test_registration_rejects_invalid_cpf(client, cpf):
+    response = client.post(
+        "/usuarios",
+        json={
+            "nome": "Maria Souza",
+            "email": "maria@example.com",
+            "cpf": cpf,
+            "telefone": "61988887777",
+            "endereco": "Rua das Flores, 10",
+            "cep": "70000000",
+            "estado": "DF",
+            "senha": "senha-segura-123",
+            "tipo": "paciente",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_password_recovery_by_cpf_updates_password(client, monkeypatch):
+    calls = []
+
+    def reset(email, cpf, senha_hash):
+        calls.append((email, cpf, senha_hash))
+        return True
+
+    monkeypatch.setattr(auth_router, "redefinir_senha_por_cpf", reset)
+    monkeypatch.setattr(auth_router, "hash_password", lambda _: "novo-hash")
+
+    response = client.post(
+        "/auth/recuperar-senha-cpf",
+        json={"cpf": "529.982.247-25", "email": "Maria@Example.com", "senha": "nova-senha-123"},
+    )
+
+    assert response.status_code == 204
+    assert calls == [("maria@example.com", "52998224725", "novo-hash")]
+
+
+def test_password_recovery_by_cpf_rejects_wrong_data(client, monkeypatch):
+    monkeypatch.setattr(auth_router, "redefinir_senha_por_cpf", lambda *_: False)
+
+    response = client.post(
+        "/auth/recuperar-senha-cpf",
+        json={"cpf": "529.982.247-25", "email": "maria@example.com", "senha": "nova-senha-123"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_distance_between_brasilia_and_goiania_is_realistic():
+    from geolocalizacao import distancia_km
+
+    brasilia = (-15.7939, -47.8828)
+    goiania = (-16.6869, -49.2648)
+
+    assert 170 < distancia_km(brasilia, goiania) < 180
+    assert distancia_km(brasilia, brasilia) == 0
+
+
+def test_nearby_nutritionists_requires_authentication(client):
+    response = client.get("/usuarios/nutricionistas/proximos")
+
+    assert response.status_code == 401
+
+
+def test_nearby_nutritionists_returns_distance_without_address(client, monkeypatch):
+    patient = {"id": "507f1f77bcf86cd799439011", "perfil": "paciente", "ativo": True}
+    main.app.dependency_overrides[usuario_router.get_current_user] = lambda: patient
+    calls = []
+
+    def nearby(patient_id, radius, state):
+        calls.append((patient_id, radius, state))
+        return [{
+            "id": "507f1f77bcf86cd799439012",
+            "nome": "Amanda Ribeiro",
+            "estado": "DF",
+            "data_inicio": "2026-01-01",
+            "distancia_km": 3.2,
+        }]
+
+    monkeypatch.setattr(usuario_router, "listar_nutricionistas_proximos", nearby)
+    try:
+        response = client.get("/usuarios/nutricionistas/proximos?raio_km=10&estado=df")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()[0]["distancia_km"] == 3.2
+    assert "cep" not in response.json()[0]
+    assert "endereco" not in response.json()[0]
+    assert calls == [("507f1f77bcf86cd799439011", 10.0, "df")]
+
+
+def test_nearby_nutritionists_reports_unknown_patient_location(client, monkeypatch):
+    patient = {"id": "507f1f77bcf86cd799439011", "perfil": "paciente", "ativo": True}
+    main.app.dependency_overrides[usuario_router.get_current_user] = lambda: patient
+    monkeypatch.setattr(usuario_router, "listar_nutricionistas_proximos", lambda *_: None)
+    try:
+        response = client.get("/usuarios/nutricionistas/proximos")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+
+
+def test_cpf_is_stored_only_as_keyed_hash():
+    digest = usuario_crud.hash_cpf("52998224725")
+
+    assert digest != "52998224725"
+    assert len(digest) == 64
+    assert digest == usuario_crud.hash_cpf("52998224725")
 
 
 def test_public_registration_cannot_choose_role(client):
@@ -512,7 +628,7 @@ def test_update_plan_serializes_nested_meals_without_model_dump_error(monkeypatc
 
     assert result["titulo"] == "Plano atualizado"
     assert result["refeicoes"][0]["horario"] == "07:30"
-    assert result["refeicoes"][0]["opcoes"][0]["nome"] == "Aveia"
+    assert result["refeicoes"][0]["alimentos"][0]["nome"] == "Aveia"
 
 
 def test_food_catalog_search_is_public_and_includes_portions(client, monkeypatch):
@@ -976,6 +1092,7 @@ def test_registration_normalizes_empty_crn_for_patient():
     usuario = UsuarioCreate(
         nome="Maria Souza",
         email="maria@example.com",
+        cpf="529.982.247-25",
         telefone="61988887777",
         endereco="Rua das Flores, 10",
         cep="70000000",
@@ -1032,3 +1149,188 @@ def test_registration_rejects_unknown_state():
 def test_payment_link_requires_https():
     with pytest.raises(ValidationError):
         UsuarioUpdate(pagseguro_link="http://pag.ae/example")
+
+
+PATIENT = {"id": "507f1f77bcf86cd799439011", "perfil": "paciente", "nome": "Maria Souza", "ativo": True}
+NUTRITIONIST = {"id": "507f1f77bcf86cd799439012", "perfil": "nutricionista", "nome": "Amanda Ribeiro", "ativo": True}
+COMMENT = {
+    "id": "507f1f77bcf86cd799439013",
+    "autor": "Maria",
+    "anonimo": False,
+    "nota": 5,
+    "comentario": "Ótima profissional!",
+    "criado_em": "2026-09-01T12:00:00Z",
+}
+
+
+def test_comments_are_public_and_never_expose_patient_ids(client, monkeypatch):
+    monkeypatch.setattr(comentario_router, "listar_comentarios", lambda _: [COMMENT])
+
+    response = client.get(f"/comentarios/nutricionista/{NUTRITIONIST['id']}")
+
+    assert response.status_code == 200
+    assert response.json()[0]["autor"] == "Maria"
+    assert "paciente_id" not in response.json()[0]
+
+
+def test_patient_without_finished_appointment_cannot_comment(client, monkeypatch):
+    main.app.dependency_overrides[comentario_router.get_current_user] = lambda: PATIENT
+    monkeypatch.setattr(comentario_router, "paciente_pode_comentar", lambda *_: False)
+    try:
+        response = client.put(
+            f"/comentarios/nutricionista/{NUTRITIONIST['id']}",
+            json={"nota": 5, "comentario": "Muito bom"},
+        )
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+
+
+def test_patient_with_finished_appointment_can_comment(client, monkeypatch):
+    saved = []
+    main.app.dependency_overrides[comentario_router.get_current_user] = lambda: PATIENT
+    monkeypatch.setattr(comentario_router, "paciente_pode_comentar", lambda *_: True)
+
+    def save(patient, nutritionist_id, data):
+        saved.append((patient["id"], nutritionist_id, data.nota, data.comentario, data.anonimo))
+        return {**COMMENT, "anonimo": True, "autor": "Anônimo"}
+
+    monkeypatch.setattr(comentario_router, "salvar_comentario", save)
+    try:
+        response = client.put(
+            f"/comentarios/nutricionista/{NUTRITIONIST['id']}",
+            json={"nota": 4, "comentario": "  Gostei bastante  ", "anonimo": True},
+        )
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["autor"] == "Anônimo"
+    assert saved == [(PATIENT["id"], NUTRITIONIST["id"], 4, "Gostei bastante", True)]
+
+
+@pytest.mark.parametrize("nota", [0, 6])
+def test_comment_rating_must_be_between_one_and_five(client, nota):
+    main.app.dependency_overrides[comentario_router.get_current_user] = lambda: PATIENT
+    try:
+        response = client.put(
+            f"/comentarios/nutricionista/{NUTRITIONIST['id']}",
+            json={"nota": nota, "comentario": "Comentário"},
+        )
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+
+
+def test_nutritionist_cannot_comment(client):
+    main.app.dependency_overrides[comentario_router.get_current_user] = lambda: NUTRITIONIST
+    try:
+        response = client.put(
+            f"/comentarios/nutricionista/{NUTRITIONIST['id']}",
+            json={"nota": 5, "comentario": "Comentário"},
+        )
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+
+
+def test_patient_cannot_reply_comments(client):
+    main.app.dependency_overrides[comentario_router.get_current_user] = lambda: PATIENT
+    try:
+        response = client.put(f"/comentarios/{COMMENT['id']}/resposta", json={"texto": "Obrigada!"})
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+
+
+def test_nutritionist_replies_only_own_comments(client, monkeypatch):
+    main.app.dependency_overrides[comentario_router.get_current_user] = lambda: NUTRITIONIST
+    monkeypatch.setattr(comentario_router, "responder_comentario", lambda *_: None)
+    try:
+        response = client.put(f"/comentarios/{COMMENT['id']}/resposta", json={"texto": "Obrigada!"})
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+
+
+def test_nutritionist_reply_is_returned_with_comment(client, monkeypatch):
+    main.app.dependency_overrides[comentario_router.get_current_user] = lambda: NUTRITIONIST
+    reply = {"texto": "Obrigada, Maria!", "respondido_em": "2026-09-02T12:00:00Z"}
+    monkeypatch.setattr(comentario_router, "responder_comentario", lambda *_: {**COMMENT, "resposta": reply})
+    try:
+        response = client.put(f"/comentarios/{COMMENT['id']}/resposta", json={"texto": "Obrigada, Maria!"})
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["resposta"]["texto"] == "Obrigada, Maria!"
+
+
+def test_anonymous_comment_hides_patient_name():
+    from crud.comentario_crud import _serializar
+
+    comment = {
+        "_id": ObjectId(COMMENT["id"]),
+        "anonimo": True,
+        "nota": 3,
+        "comentario": "Ok",
+        "criado_em": datetime(2026, 9, 1, tzinfo=timezone.utc),
+    }
+
+    assert _serializar(comment, "Maria Souza")["autor"] == "Anônimo"
+    assert _serializar({**comment, "anonimo": False}, "Maria Souza")["autor"] == "Maria"
+
+
+def test_meal_accepts_several_foods_each_with_substitutions():
+    from schemas.plano_schema import RefeicaoPlano
+
+    meal = RefeicaoPlano(
+        horario="07:00",
+        nome="Café da manhã",
+        alimentos=[
+            {
+                "nome": "Cuscuz",
+                "quantidade": 100,
+                "medida": "g",
+                "calorias": 112,
+                "substituicoes": [{"nome": "Pão francês", "quantidade": 1, "medida": "unidade", "calorias": 150}],
+            },
+            {"nome": "Café sem açúcar", "quantidade": 1, "medida": "xícara", "calorias": 5},
+            {"nome": "Banana", "quantidade": 1, "medida": "unidade", "calorias": 90},
+        ],
+    )
+
+    assert [food.nome for food in meal.alimentos] == ["Cuscuz", "Café sem açúcar", "Banana"]
+    assert meal.alimentos[0].substituicoes[0].nome == "Pão francês"
+    assert meal.alimentos[1].substituicoes == []
+
+
+def test_meal_in_old_format_becomes_main_food_with_substitutions():
+    from schemas.plano_schema import RefeicaoPlano
+
+    meal = RefeicaoPlano(
+        horario="07:00",
+        nome="Café da manhã",
+        opcoes=[
+            {"nome": "Aveia", "quantidade": 40, "medida": "g", "calorias": 150},
+            {"nome": "Granola", "quantidade": 30, "medida": "g", "calorias": 130},
+        ],
+    )
+
+    assert len(meal.alimentos) == 1
+    assert meal.alimentos[0].nome == "Aveia"
+    assert meal.alimentos[0].substituicoes[0].nome == "Granola"
+    assert "opcoes" not in meal.model_dump()
+
+
+def test_meal_requires_at_least_one_food():
+    from schemas.plano_schema import RefeicaoPlano
+
+    with pytest.raises(ValidationError):
+        RefeicaoPlano(horario="07:00", nome="Café da manhã", alimentos=[])
+

@@ -44,6 +44,10 @@
             method: "POST",
             body: JSON.stringify({ email }),
         }),
+        redefinirSenhaPorCpf: (dados) => request("/auth/recuperar-senha-cpf", {
+            method: "POST",
+            body: JSON.stringify(dados),
+        }),
         redefinirSenha: (token, senha) => request("/auth/redefinir-senha", {
             method: "POST",
             body: JSON.stringify({ token, senha }),
@@ -70,6 +74,28 @@
             const query = estado ? `?estado=${encodeURIComponent(estado)}` : "";
             return request(`/usuarios/nutricionistas${query}`);
         },
+        listarNutricionistasProximos: ({ estado, raioKm } = {}) => {
+            const params = new URLSearchParams();
+            if (estado) params.set("estado", estado);
+            if (raioKm) params.set("raio_km", raioKm);
+            const query = params.toString() ? `?${params}` : "";
+            return request(`/usuarios/nutricionistas/proximos${query}`);
+        },
+        listarComentarios: (nutricionistaId) =>
+            request(`/comentarios/nutricionista/${encodeURIComponent(nutricionistaId)}`),
+        meuComentario: (nutricionistaId) =>
+            request(`/comentarios/nutricionista/${encodeURIComponent(nutricionistaId)}/meu`),
+        salvarComentario: (nutricionistaId, dados) =>
+            request(`/comentarios/nutricionista/${encodeURIComponent(nutricionistaId)}`, {
+                method: "PUT",
+                body: JSON.stringify(dados),
+            }),
+        comentariosRecebidos: () => request("/comentarios/recebidos"),
+        responderComentario: (comentarioId, texto) =>
+            request(`/comentarios/${encodeURIComponent(comentarioId)}/resposta`, {
+                method: "PUT",
+                body: JSON.stringify({ texto }),
+            }),
         obterNutricionista: (id) =>
             request(`/usuarios/nutricionistas/${encodeURIComponent(id)}`),
         listarPlanos: () => request("/planos"),

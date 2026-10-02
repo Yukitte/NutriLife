@@ -11,10 +11,12 @@ from crud.usuario_crud import (
     buscar_usuario_com_senha,
     guardar_nonce_recuperacao,
     redefinir_senha,
+    redefinir_senha_por_cpf,
     serializar_usuario,
 )
 from schemas.usuario_schema import (
     RecuperacaoSenhaConfirmar,
+    RecuperacaoSenhaCpf,
     RecuperacaoSenhaSolicitar,
     TokenResponse,
     UsuarioLogin,
@@ -112,6 +114,13 @@ def solicitar_recuperacao(request: RecuperacaoSenhaSolicitar):
         token = create_password_reset_token(str(user["_id"]), nonce)
         _enviar_link_recuperacao(email, token)
     return {"detail": "Se o e-mail estiver cadastrado, enviaremos instruções de recuperação."}
+
+
+@router.post("/recuperar-senha-cpf", status_code=status.HTTP_204_NO_CONTENT)
+def recuperar_senha_por_cpf(request: RecuperacaoSenhaCpf):
+    if not redefinir_senha_por_cpf(str(request.email).lower(), request.cpf, hash_password(request.senha)):
+        raise HTTPException(status_code=400, detail="CPF ou e-mail não conferem com nenhum cadastro.")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/redefinir-senha", status_code=status.HTTP_204_NO_CONTENT)

@@ -12,29 +12,33 @@
 <body data-page="password-reset">
     <main class="auth-page">
         <section class="auth-panel auth-panel--standalone">
-            <a class="auth-brand" href="../../index.html" aria-label="NutriLife - página inicial">
-                <img src="../../assets/images/NutriLife-logo-semfundo.png" alt="NutriLife">
-            </a>
-            <a href="./login.html" class="btn btn--ghost">Voltar para login</a>
+            <div class="auth-panel__top">
+                <a class="auth-brand" href="../../index.html" aria-label="NutriLife - página inicial">
+                    <img src="../../assets/images/NutriLife-logo-semfundo.png" alt="NutriLife">
+                </a>
+                <a href="./login.html" class="btn btn--ghost auth-back">← Voltar para login</a>
+            </div>
             <span class="eyebrow">Recuperação de acesso</span>
             <h1>Redefinir senha</h1>
-            <p>Informe seu e-mail e escolha uma nova senha. O link será enviado ao e-mail cadastrado.</p>
+            <p class="auth-panel__intro">Informe o CPF e o e-mail usados no cadastro e escolha uma nova senha.</p>
             <form id="password-reset-form" class="auth-form is-active">
-                <div id="reset-email-group" class="input-group">
+                <div class="input-group">
+                    <label for="reset-cpf">CPF</label>
+                    <input id="reset-cpf" name="cpf" inputmode="numeric" placeholder="000.000.000-00" minlength="14" maxlength="14" pattern="\d{3}\.\d{3}\.\d{3}-\d{2}" title="Informe o CPF, ex.: 000.000.000-00" required>
+                </div>
+                <div class="input-group">
                     <label for="reset-email">E-mail</label>
-                    <input id="reset-email" name="email" type="email" autocomplete="email" required>
+                    <input id="reset-email" name="email" type="email" placeholder="seu@email.com" autocomplete="email" required>
                 </div>
-                <div id="reset-password-fields" class="dashboard-form" hidden>
-                    <div class="input-group">
-                        <label for="reset-password">Nova senha</label>
-                        <input id="reset-password" name="senha" type="password" minlength="8" maxlength="128">
-                    </div>
-                    <div class="input-group">
-                        <label for="reset-confirm-password">Confirmar nova senha</label>
-                        <input id="reset-confirm-password" name="confirmacao" type="password" minlength="8" maxlength="128">
-                    </div>
+                <div class="input-group">
+                    <label for="reset-password">Nova senha</label>
+                    <input id="reset-password" name="senha" type="password" placeholder="Mínimo de 8 caracteres" autocomplete="new-password" minlength="8" maxlength="128" required>
                 </div>
-                <button class="btn btn--primary" type="submit">Confirmar</button>
+                <div class="input-group">
+                    <label for="reset-confirm-password">Confirmar nova senha</label>
+                    <input id="reset-confirm-password" name="confirmacao" type="password" placeholder="Repita a nova senha" autocomplete="new-password" minlength="8" maxlength="128" required>
+                </div>
+                <button class="btn btn--primary" type="submit">Redefinir senha</button>
                 <p id="reset-status" class="auth-status" aria-live="polite"></p>
             </form>
         </section>

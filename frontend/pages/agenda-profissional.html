@@ -14,10 +14,15 @@
         <aside class="dashboard-sidebar">
             <a class="brand" href="../index.html"><img src="../assets/images/NutriLife-logo-semfundo.png" alt="NutriLife" class="brand-logo"></a>
             <nav class="sidebar-nav" aria-label="Navegação do painel">
-                <a href="../dashboard.html" class="sidebar-link">Início</a>
-                <a href="./pacientes.html" class="sidebar-link">Pacientes</a>
-                <a href="./consultas.html" class="sidebar-link">Agendamentos</a>
-                <a href="./agenda-profissional.html" class="sidebar-link is-active" aria-current="page">Disponibilidade</a>
+                <a id="overview-nav" href="../dashboard.html" class="sidebar-link" hidden>Visão geral</a>
+                <a id="patient-home-nav" href="./home-paciente.html" class="sidebar-link" hidden>Minha área</a>
+                <a id="search-nav" href="./busca.html" class="sidebar-link" hidden>Buscar nutricionista</a>
+                <a id="patients-nav" href="./pacientes.html" class="sidebar-link" hidden>Pacientes</a>
+                <a id="plans-nav" href="./planos.html" class="sidebar-link" hidden>Planos alimentares</a>
+                <a id="appointments-nav" href="./consultas.html" class="sidebar-link" hidden>Agendamentos</a>
+                <a id="availability-nav" href="./agenda-profissional.html" class="sidebar-link is-active" aria-current="page" hidden>Disponibilidade</a>
+                <a id="profile-nav" href="./perfil-profissional.html" class="sidebar-link" hidden>Meu perfil</a>
+                <a id="admin-users-nav" href="./administracao.html" class="sidebar-link" hidden>Administrar usuários</a>
             </nav>
             <button id="logout-button" class="sidebar-logout" type="button">Sair</button>
         </aside>
@@ -69,6 +74,11 @@
             </section>
         </main>
     </div>
+    <footer class="app-footer">
+        <img src="../assets/images/NutriLife-logo-semfundo.png" alt="NutriLife" class="app-footer__logo">
+        <p>© 2026 NutriLife. Todos os direitos reservados.</p>
+    </footer>
+
     <script src="../config.js" defer></script><script src="../js/api.js" defer></script><script src="../js/app.js" defer></script>
 </body>
 </html>

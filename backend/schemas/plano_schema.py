@@ -64,12 +64,25 @@ class OpcaoAlimento(BaseModel):
         return self
 
 
+class ItemRefeicao(OpcaoAlimento):
+    substituicoes: list[OpcaoAlimento] = Field(default_factory=list, max_length=5)
+
+
 class RefeicaoPlano(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     horario: str = Field(pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
     nome: str = Field(min_length=2, max_length=120)
-    opcoes: list[OpcaoAlimento] = Field(min_length=1, max_length=10)
+    alimentos: list[ItemRefeicao] = Field(min_length=1, max_length=15)
+
+    @model_validator(mode="before")
+    @classmethod
+    def converter_formato_antigo(cls, data):
+        if isinstance(data, dict) and "alimentos" not in data and data.get("opcoes"):
+            data = dict(data)
+            principal, *substituicoes = data.pop("opcoes")
+            data["alimentos"] = [{**principal, "substituicoes": substituicoes}]
+        return data
 
     @field_validator("nome")
     @classmethod

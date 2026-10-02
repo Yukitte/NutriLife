@@ -27,7 +27,7 @@ def _serializar_plano(plano: dict) -> dict:
             refeicao if isinstance(refeicao, dict) else {
                 "horario": "00:00",
                 "nome": refeicao,
-                "opcoes": [{
+                "alimentos": [{
                     "nome": refeicao,
                     "quantidade": 1,
                     "medida": "porção",

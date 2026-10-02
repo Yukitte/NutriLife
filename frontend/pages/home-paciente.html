@@ -18,10 +18,15 @@
                 </a>
             </div>
             <nav class="sidebar-nav" aria-label="Navegação do painel">
-                <a href="./home-paciente.html" class="sidebar-link is-active" aria-current="page">Minha área</a>
-                <a href="./busca.html" class="sidebar-link">Buscar nutricionista</a>
-                <a href="./planos.html" class="sidebar-link">Planos alimentares</a>
-                <a href="./consultas.html" class="sidebar-link">Agendamentos</a>
+                <a id="overview-nav" href="../dashboard.html" class="sidebar-link" hidden>Visão geral</a>
+                <a id="patient-home-nav" href="./home-paciente.html" class="sidebar-link is-active" aria-current="page" hidden>Minha área</a>
+                <a id="search-nav" href="./busca.html" class="sidebar-link" hidden>Buscar nutricionista</a>
+                <a id="patients-nav" href="./pacientes.html" class="sidebar-link" hidden>Pacientes</a>
+                <a id="plans-nav" href="./planos.html" class="sidebar-link" hidden>Planos alimentares</a>
+                <a id="appointments-nav" href="./consultas.html" class="sidebar-link" hidden>Agendamentos</a>
+                <a id="availability-nav" href="./agenda-profissional.html" class="sidebar-link" hidden>Disponibilidade</a>
+                <a id="profile-nav" href="./perfil-profissional.html" class="sidebar-link" hidden>Meu perfil</a>
+                <a id="admin-users-nav" href="./administracao.html" class="sidebar-link" hidden>Administrar usuários</a>
             </nav>
             <button id="logout-button" class="sidebar-logout" type="button">Sair</button>
         </aside>
@@ -75,7 +80,17 @@
                                 <option>SE</option><option>TO</option>
                             </select>
                         </div>
-                        <p class="item-meta">A lista mostra profissionais cadastrados; a plataforma ainda não filtra por distância.</p>
+                        <div class="input-group">
+                            <label for="distance-filter">Distância</label>
+                            <select id="distance-filter" name="raio_km">
+                                <option value="">Qualquer distância</option>
+                                <option value="5">Até 5 km</option>
+                                <option value="10">Até 10 km</option>
+                                <option value="25">Até 25 km</option>
+                                <option value="50">Até 50 km</option>
+                            </select>
+                        </div>
+                        <p class="item-meta">A distância é calculada a partir do CEP do seu cadastro.</p>
                         <button class="btn btn--primary" type="submit">Buscar</button>
                     </form>
                 </section>
@@ -83,6 +98,11 @@
             </section>
         </main>
     </div>
+    <footer class="app-footer">
+        <img src="../assets/images/NutriLife-logo-semfundo.png" alt="NutriLife" class="app-footer__logo">
+        <p>© 2026 NutriLife. Todos os direitos reservados.</p>
+    </footer>
+
     <script src="../config.js" defer></script>
     <script src="../js/api.js" defer></script>
     <script src="../js/app.js" defer></script>

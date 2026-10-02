@@ -1,10 +1,18 @@
 from datetime import datetime, timezone
 from hashlib import sha256
+import hmac
 
 from bson import ObjectId
 
 from database.connection import get_database
+from geolocalizacao import coordenadas_por_cep, distancia_km
 from schemas.usuario_schema import AdministradorUsuarioUpdate, UsuarioCreate, UsuarioUpdate
+from settings import get_settings
+
+
+def hash_cpf(cpf: str) -> str:
+    chave = get_settings().jwt_secret_key.encode()
+    return hmac.new(chave, cpf.encode(), sha256).hexdigest()
 
 
 def serializar_usuario(usuario: dict) -> dict:
@@ -32,6 +40,7 @@ def criar_usuario(usuario: UsuarioCreate, senha_hash: str) -> dict:
     document = {
         "nome": usuario.nome.strip(),
         "email": str(usuario.email).lower(),
+        "cpf_hash": hash_cpf(usuario.cpf),
         "senha_hash": senha_hash,
         "perfil": usuario.tipo,
         "telefone": usuario.telefone,
@@ -75,6 +84,14 @@ def redefinir_senha(usuario_id: str, nonce: str, senha_hash: str) -> bool:
         },
     )
     return result.modified_count == 1
+
+
+def redefinir_senha_por_cpf(email: str, cpf: str, senha_hash: str) -> bool:
+    result = get_database()["usuarios"].update_one(
+        {"email": email.lower(), "cpf_hash": hash_cpf(cpf), "ativo": {"$ne": False}},
+        {"$set": {"senha_hash": senha_hash}, "$unset": {"reset_nonce_hash": ""}},
+    )
+    return result.matched_count == 1
 
 
 def paciente_vinculado(nutricionista_id: str, paciente_id: str) -> bool:
@@ -144,6 +161,48 @@ def listar_nutricionistas(estado: str | None = None) -> list[dict]:
         {"senha_hash": 0, "endereco": 0, "cep": 0, "pagseguro_link": 0},
     ).sort("nome", 1)
     return [_serializar_profissional(professional) for professional in professionals]
+
+
+def coordenadas_do_usuario(usuario: dict) -> tuple[float, float] | None:
+    cep = usuario.get("cep")
+    if not cep:
+        return None
+    geo = usuario.get("geo") or {}
+    if geo.get("cep") == cep:
+        return geo["lat"], geo["lng"]
+    coordenadas = coordenadas_por_cep(cep)
+    if coordenadas:
+        get_database()["usuarios"].update_one(
+            {"_id": usuario["_id"]},
+            {"$set": {"geo": {"cep": cep, "lat": coordenadas[0], "lng": coordenadas[1]}}},
+        )
+    return coordenadas
+
+
+def listar_nutricionistas_proximos(
+    paciente_id: str,
+    raio_km: float | None = None,
+    estado: str | None = None,
+) -> list[dict] | None:
+    collection = get_database()["usuarios"]
+    paciente = collection.find_one({"_id": ObjectId(paciente_id)})
+    origem = coordenadas_do_usuario(paciente) if paciente else None
+    if origem is None:
+        return None
+
+    query: dict = {"perfil": "nutricionista", "ativo": {"$ne": False}}
+    if estado:
+        query["estado"] = estado.upper()
+
+    resultado = []
+    for professional in collection.find(query, {"senha_hash": 0}):
+        destino = coordenadas_do_usuario(professional)
+        distancia = round(distancia_km(origem, destino), 1) if destino else None
+        if raio_km is not None and (distancia is None or distancia > raio_km):
+            continue
+        resultado.append({**_serializar_profissional(professional), "distancia_km": distancia})
+
+    return sorted(resultado, key=lambda item: (item["distancia_km"] is None, item["distancia_km"] or 0, item["nome"]))
 
 
 def buscar_nutricionista(usuario_id: str) -> dict | None:

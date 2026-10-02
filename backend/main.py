@@ -8,6 +8,7 @@ from database.connection import get_client, get_database
 from routers.admin_router import router as admin_router
 from routers.alimento_router import router as alimento_router
 from routers.auth_router import router as auth_router
+from routers.comentario_router import router as comentario_router
 from routers.consulta_router import router as consulta_router
 from routers.plano_router import router as plano_router
 from routers.usuario_router import router as usuario_router
@@ -35,6 +36,21 @@ def initialize_database() -> None:
                 {"$set": {"email": normalized_email}},
             )
     users.create_index("email", unique=True, name="unique_user_email")
+    users.create_index(
+        "cpf_hash",
+        unique=True,
+        partialFilterExpression={"cpf_hash": {"$type": "string"}},
+        name="unique_user_cpf",
+    )
+    database["comentarios"].create_index(
+        [("paciente_id", 1), ("nutricionista_id", 1)],
+        unique=True,
+        name="unique_comment_per_patient_and_nutritionist",
+    )
+    database["comentarios"].create_index(
+        [("nutricionista_id", 1), ("criado_em", -1)],
+        name="comments_by_nutritionist",
+    )
     database["planos"].create_index(
         [("paciente_id", 1), ("nutricionista_id", 1)],
         name="plans_by_patient_and_nutritionist",
@@ -73,6 +89,7 @@ app.include_router(alimento_router)
 app.include_router(usuario_router)
 app.include_router(plano_router)
 app.include_router(consulta_router)
+app.include_router(comentario_router)
 
 
 @app.get("/health", tags=["Sistema"])

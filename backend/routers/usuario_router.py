@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pymongo.errors import DuplicateKeyError
 
 from crud.usuario_crud import (
@@ -7,6 +7,7 @@ from crud.usuario_crud import (
     buscar_nutricionista,
     criar_usuario,
     listar_nutricionistas,
+    listar_nutricionistas_proximos,
     listar_pacientes,
     paciente_vinculado,
     remover_usuario,
@@ -28,7 +29,9 @@ def cadastrar_usuario(usuario: UsuarioCreate):
     try:
         created = criar_usuario(usuario, hash_password(usuario.senha))
     except DuplicateKeyError as error:
-        raise HTTPException(status_code=409, detail="E-mail já cadastrado.") from error
+        campo = (error.details or {}).get("keyPattern", {})
+        detail = "CPF já cadastrado." if "cpf_hash" in campo else "E-mail já cadastrado."
+        raise HTTPException(status_code=409, detail=detail) from error
     return {
         "access_token": create_access_token(created["id"]),
         "usuario": created,
@@ -79,6 +82,27 @@ def consultar_nutricionistas(estado: str | None = None):
     if estado and len(estado.strip()) != 2:
         raise HTTPException(status_code=422, detail="Informe a sigla de um estado.")
     return listar_nutricionistas(estado.strip() if estado else None)
+
+
+@router.get("/nutricionistas/proximos", response_model=list[UsuarioPublico])
+def consultar_nutricionistas_proximos(
+    raio_km: float | None = Query(default=None, gt=0, le=500),
+    estado: str | None = None,
+    usuario: dict = Depends(get_current_user),
+):
+    if estado and len(estado.strip()) != 2:
+        raise HTTPException(status_code=422, detail="Informe a sigla de um estado.")
+    profissionais = listar_nutricionistas_proximos(
+        usuario["id"],
+        raio_km,
+        estado.strip() if estado else None,
+    )
+    if profissionais is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Não foi possível localizar o CEP do seu cadastro. Confira o CEP no seu perfil.",
+        )
+    return profissionais
 
 
 @router.get("/nutricionistas/{usuario_id}", response_model=UsuarioPublico)
