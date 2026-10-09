@@ -1,0 +1,146 @@
+INFO:     Will watch for changes in these directories: ['C:\\Users\\gabri\\Videos\\NutriLife\\backend']
+INFO:     Loading environment from '.env'
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [5268] using WatchFiles
+INFO:     Started server process [20452]
+INFO:     Waiting for application startup.
+ERROR:    Traceback (most recent call last):
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\starlette\routing.py", line 654, in lifespan
+    async with self.lifespan_context(app) as maybe_state:
+               ~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\gabri\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 214, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\fastapi\routing.py", line 247, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\gabri\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 214, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\fastapi\routing.py", line 247, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\gabri\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 214, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\fastapi\routing.py", line 247, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\gabri\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 214, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\fastapi\routing.py", line 247, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\gabri\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 214, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\fastapi\routing.py", line 247, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\gabri\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 214, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\fastapi\routing.py", line 247, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\gabri\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 214, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gabri\Videos\NutriLife\backend\main.py", line 56, in lifespan
+    initialize_database()
+    ~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\gabri\Videos\NutriLife\backend\main.py", line 22, in initialize_database
+    users.update_many(
+    ~~~~~~~~~~~~~~~~~^
+        {"perfil": {"$exists": False}, "tipo": {"$in": ["NUTRICIONISTA", "nutricionista"]}},
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        {"$set": {"perfil": "nutricionista"}},
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\pymongo\synchronous\collection.py", line 1414, in update_many
+    self._update_retryable(
+    ~~~~~~~~~~~~~~~~~~~~~~^
+        filter,
+        ^^^^^^^
+    ...<11 lines>...
+        comment=comment,
+        ^^^^^^^^^^^^^^^^
+    ),
+    ^
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\pymongo\synchronous\collection.py", line 1098, in _update_retryable
+    return self._database.client._retryable_write(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        (write_concern or self.write_concern).acknowledged and not multi,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        operation,
+        ^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 2099, in _retryable_write
+    return self._retry_with_session(retryable, func, s, bulk, operation, operation_id)
+           ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 1969, in _retry_with_session
+    return self._retry_internal(
+           ~~~~~~~~~~~~~~~~~~~~^
+        func=func,
+        ^^^^^^^^^^
+    ...<4 lines>...
+        operation_id=operation_id,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\pymongo\_csot.py", line 126, in csot_wrapper
+    return func(self, *args, **kwargs)
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 2022, in _retry_internal
+    ).run()
+      ~~~^^
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 2890, in run
+    res = self._read() if self._is_read else self._write()
+                                             ~~~~~~~~~~~^^
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 3087, in _write
+    self._server = self._get_server()
+                   ~~~~~~~~~~~~~~~~^^
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 3063, in _get_server
+    return self._client._select_server(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self._server_selector,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        operation_id=self._operation_id,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\pymongo\synchronous\mongo_client.py", line 1862, in _select_server
+    server = topology.select_server(
+        server_selector,
+    ...<2 lines>...
+        operation_id=operation_id,
+    )
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\pymongo\synchronous\topology.py", line 357, in select_server
+    server = self._select_server(
+        selector,
+    ...<4 lines>...
+        operation_id=operation_id,
+    )
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\pymongo\synchronous\topology.py", line 331, in _select_server
+    servers = self.select_servers(
+        selector,
+    ...<4 lines>...
+        deprioritized_servers,
+    )
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\pymongo\synchronous\topology.py", line 249, in select_servers
+    server_descriptions = self._select_servers_loop(
+        selector,
+    ...<4 lines>...
+        deprioritized_servers=deprioritized_servers,
+    )
+  File "C:\Users\gabri\Videos\NutriLife\.venv\Lib\site-packages\pymongo\synchronous\topology.py", line 297, in _select_servers_loop
+    raise ServerSelectionTimeoutError(
+        f"{self._error_message(selector)}, Timeout: {timeout}s, Topology Description: {self.description!r}"
+    )
+pymongo.errors.ServerSelectionTimeoutError: No replica set members found yet, Timeout: 5.0s, Topology Description: <TopologyDescription id: 6ac0f6b268360bc6ef85a4c7, topology_type: ReplicaSetNoPrimary, servers: [<ServerDescription ('ac-jlhfmwy-shard-00-00.jfjbmb0.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-jlhfmwy-shard-00-01.jfjbmb0.mongodb.net', 27017) server_type: Unknown, rtt: None>, <ServerDescription ('ac-jlhfmwy-shard-00-02.jfjbmb0.mongodb.net', 27017) server_type: Unknown, rtt: None>]>
+
+ERROR:    Application startup failed. Exiting.
