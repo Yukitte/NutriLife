@@ -5,12 +5,23 @@ from crud.usuario_crud import paciente_vinculado
 from schemas.plano_schema import PlanoCreate, PlanoUpdate
 
 
-def _serializar_plano(plano: dict) -> dict:
-    database = get_database()
-    paciente = database["usuarios"].find_one({"_id": plano["paciente_id"]})
-    nutricionista = database["usuarios"].find_one(
-        {"_id": plano["nutricionista_id"]}
-    )
+def _nomes_por_id(ids: set) -> dict:
+    if not ids:
+        return {}
+    return {
+        usuario["_id"]: usuario["nome"]
+        for usuario in get_database()["usuarios"].find({"_id": {"$in": list(ids)}}, {"nome": 1})
+    }
+
+
+def _serializar_plano(plano: dict, nomes: dict | None = None) -> dict:
+    if nomes is None:
+        database = get_database()
+        paciente = database["usuarios"].find_one({"_id": plano["paciente_id"]})
+        nutricionista = database["usuarios"].find_one({"_id": plano["nutricionista_id"]})
+    else:
+        paciente = {"nome": nomes[plano["paciente_id"]]} if plano["paciente_id"] in nomes else None
+        nutricionista = {"nome": nomes[plano["nutricionista_id"]]} if plano["nutricionista_id"] in nomes else None
     return {
         "id": str(plano["_id"]),
         "paciente_id": str(plano["paciente_id"]),
@@ -68,8 +79,9 @@ def criar_plano(plano: PlanoCreate, nutricionista: dict) -> dict | None:
 def listar_planos(usuario: dict) -> list[dict]:
     usuario_id = ObjectId(usuario["id"])
     field = "nutricionista_id" if usuario["perfil"] == "nutricionista" else "paciente_id"
-    planos = get_database()["planos"].find({field: usuario_id}).sort("_id", -1)
-    return [_serializar_plano(plano) for plano in planos]
+    planos = list(get_database()["planos"].find({field: usuario_id}).sort("_id", -1))
+    nomes = _nomes_por_id({plano["paciente_id"] for plano in planos} | {plano["nutricionista_id"] for plano in planos})
+    return [_serializar_plano(plano, nomes) for plano in planos]
 
 
 def atualizar_plano(plano_id: str, changes: PlanoUpdate, nutricionista: dict) -> dict | None:

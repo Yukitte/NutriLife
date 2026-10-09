@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pymongo.errors import DuplicateKeyError
 
 from crud.usuario_crud import (
@@ -19,13 +19,17 @@ from schemas.usuario_schema import (
     UsuarioResponse,
     UsuarioUpdate,
 )
+from limite_tentativas import ip_do_cliente, limite_cadastro
 from security import create_access_token, get_current_user, hash_password, require_nutritionist
 
 router = APIRouter(prefix="/usuarios", tags=["Usuários"])
 
 
 @router.post("", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def cadastrar_usuario(usuario: UsuarioCreate):
+def cadastrar_usuario(usuario: UsuarioCreate, request: Request):
+    chave = f"ip:{ip_do_cliente(request)}"
+    limite_cadastro.exigir_liberado(chave)
+    limite_cadastro.registrar(chave)
     try:
         created = criar_usuario(usuario, hash_password(usuario.senha))
     except DuplicateKeyError as error:

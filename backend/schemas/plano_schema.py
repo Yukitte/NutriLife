@@ -13,6 +13,8 @@ class OpcaoAlimento(BaseModel):
     alimento_id: str | None = Field(default=None, min_length=1, max_length=24)
     categoria: str | None = Field(default=None, max_length=120)
     porcao: str | None = Field(default=None, max_length=250)
+    quantidade_caseira: float | None = Field(default=None, gt=0, le=1000)
+    medida_caseira: str | None = Field(default=None, max_length=60)
     fonte_dados: str | None = Field(default=None, max_length=120)
     energia_kcal: float | None = Field(default=None, ge=0, le=100000)
     proteina_g: float | None = Field(default=None, ge=0, le=10000)

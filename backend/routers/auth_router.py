@@ -3,7 +3,7 @@ import secrets
 import smtplib
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import Response
 
 from crud.usuario_crud import (
@@ -21,7 +21,9 @@ from schemas.usuario_schema import (
     TokenResponse,
     UsuarioLogin,
 )
+from limite_tentativas import ip_do_cliente, limite_login, limite_recuperacao
 from security import (
+    SENHA_FICTICIA,
     create_access_token,
     create_password_reset_token,
     get_reset_token_claims,
@@ -72,18 +74,24 @@ def _enviar_link_recuperacao(email: str, token: str) -> None:
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(credentials: UsuarioLogin):
-    usuario = buscar_usuario_com_senha(str(credentials.email).lower())
-    if usuario is None or not verify_password(
+def login(credentials: UsuarioLogin, request: Request):
+    email = str(credentials.email).lower()
+    chaves = (f"ip:{ip_do_cliente(request)}", f"email:{email}")
+    limite_login.exigir_liberado(*chaves)
+    usuario = buscar_usuario_com_senha(email)
+    senha_confere = verify_password(
         credentials.senha,
-        usuario["senha_hash"],
-    ) or not usuario.get("ativo", True):
+        usuario["senha_hash"] if usuario else SENHA_FICTICIA,
+    )
+    if usuario is None or not senha_confere or not usuario.get("ativo", True):
+        limite_login.registrar(*chaves)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="E-mail ou senha inválidos.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    limite_login.limpar(f"email:{email}")
     public_user = serializar_usuario(usuario)
     return {
         "access_token": create_access_token(public_user["id"]),
@@ -92,7 +100,10 @@ def login(credentials: UsuarioLogin):
 
 
 @router.post("/recuperar-senha", status_code=status.HTTP_202_ACCEPTED)
-def solicitar_recuperacao(request: RecuperacaoSenhaSolicitar):
+def solicitar_recuperacao(request: RecuperacaoSenhaSolicitar, http_request: Request):
+    chaves = (f"ip:{ip_do_cliente(http_request)}", f"email:{str(request.email).lower()}")
+    limite_recuperacao.exigir_liberado(*chaves)
+    limite_recuperacao.registrar(*chaves)
     settings = get_settings()
     if not all(
         [
@@ -117,9 +128,14 @@ def solicitar_recuperacao(request: RecuperacaoSenhaSolicitar):
 
 
 @router.post("/recuperar-senha-cpf", status_code=status.HTTP_204_NO_CONTENT)
-def recuperar_senha_por_cpf(request: RecuperacaoSenhaCpf):
-    if not redefinir_senha_por_cpf(str(request.email).lower(), request.cpf, hash_password(request.senha)):
+def recuperar_senha_por_cpf(request: RecuperacaoSenhaCpf, http_request: Request):
+    email = str(request.email).lower()
+    chaves = (f"cpf-ip:{ip_do_cliente(http_request)}", f"cpf-email:{email}")
+    limite_recuperacao.exigir_liberado(*chaves)
+    if not redefinir_senha_por_cpf(email, request.cpf, hash_password(request.senha)):
+        limite_recuperacao.registrar(*chaves)
         raise HTTPException(status_code=400, detail="CPF ou e-mail não conferem com nenhum cadastro.")
+    limite_recuperacao.limpar(f"cpf-email:{email}")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

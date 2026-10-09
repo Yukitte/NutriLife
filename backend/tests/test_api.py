@@ -7,11 +7,14 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 import main
+from crud import anamnese_crud
 from crud import consulta_crud
 from crud import plano_crud
+from crud import receita_crud
+from crud import mensagem_crud
 from crud import usuario_crud
 from crud.usuario_crud import _serializar_profissional
-from routers import admin_router, alimento_router, auth_router, comentario_router, consulta_router, usuario_router
+from routers import admin_router, alimento_router, anamnese_router, auth_router, comentario_router, consulta_router, medida_router, mensagem_router, receita_router, usuario_router
 from schemas.consulta_schema import (
     ConsultaAvaliacaoUpdate,
     ConsultaConfirmar,
@@ -19,6 +22,7 @@ from schemas.consulta_schema import (
     DisponibilidadeUpdate,
 )
 from schemas.plano_schema import OpcaoAlimento, PlanoUpdate
+from schemas.receita_schema import ReceitaSalvar
 from schemas.usuario_schema import AdministradorUsuarioUpdate, UsuarioCreate, UsuarioUpdate
 from scripts.build_taco_catalog import _nutrient_value
 from security import (
@@ -29,6 +33,15 @@ from security import (
     verify_password,
 )
 from settings import Settings, get_settings
+
+
+@pytest.fixture(autouse=True)
+def limpar_limites_de_tentativas():
+    from limite_tentativas import limite_cadastro, limite_login, limite_recuperacao
+
+    for limite in (limite_login, limite_recuperacao, limite_cadastro):
+        limite._registros.clear()
+    yield
 
 
 @pytest.fixture
@@ -345,7 +358,7 @@ def test_inactive_user_token_cannot_access_private_routes(client, monkeypatch):
     user_id = "507f1f77bcf86cd799439011"
     monkeypatch.setattr(
         "security.buscar_usuario",
-        lambda _: {
+        lambda *_, **__: {
             "id": user_id,
             "nome": "Maria Souza",
             "perfil": "paciente",
@@ -377,7 +390,7 @@ def test_patient_cannot_access_admin_user_list(client, monkeypatch):
     patient_id = "507f1f77bcf86cd799439011"
     monkeypatch.setattr(
         "security.buscar_usuario",
-        lambda _: {"id": patient_id, "nome": "Maria Souza", "perfil": "paciente"},
+        lambda *_, **__: {"id": patient_id, "nome": "Maria Souza", "perfil": "paciente"},
     )
     token = create_access_token(patient_id)
 
@@ -393,7 +406,7 @@ def test_administrator_can_list_users_without_password_hash(client, monkeypatch)
     admin_id = "507f1f77bcf86cd799439011"
     monkeypatch.setattr(
         "security.buscar_usuario",
-        lambda _: {
+        lambda *_, **__: {
             "id": admin_id,
             "nome": "Admin NutriLife",
             "perfil": "administrador",
@@ -532,7 +545,7 @@ def test_admin_cannot_change_profile_of_user_with_history(monkeypatch):
 def test_patient_cannot_create_plan(client, monkeypatch):
     monkeypatch.setattr(
         "security.buscar_usuario",
-        lambda _: {
+        lambda *_, **__: {
             "id": "507f1f77bcf86cd799439011",
             "nome": "Maria Souza",
             "email": "maria@example.com",
@@ -796,6 +809,62 @@ def test_availability_accepts_sao_paulo_timezone():
     assert availability.fuso_horario == "America/Sao_Paulo"
 
 
+def test_availability_rejects_repeated_specific_dates():
+    with pytest.raises(ValidationError):
+        DisponibilidadeUpdate(
+            horarios=[],
+            datas_especificas=[
+                {"data": "2030-03-04", "horarios": []},
+                {"data": "2030-03-04", "horarios": [{"inicio": "09:00", "fim": "10:00"}]},
+            ],
+        )
+
+
+def test_specific_date_overrides_weekly_schedule(monkeypatch):
+    nutritionist_id = "507f1f77bcf86cd799439013"
+    monkeypatch.setattr(
+        consulta_crud,
+        "obter_disponibilidade",
+        lambda _: {
+            "fuso_horario": "America/Sao_Paulo",
+            "horarios": [
+                {"dia_semana": 0, "inicio": "09:00", "fim": "11:00", "duracao_minutos": 60},
+                {"dia_semana": 1, "inicio": "09:00", "fim": "10:00", "duracao_minutos": 60},
+                {"dia_semana": 2, "inicio": "09:00", "fim": "10:00", "duracao_minutos": 60},
+            ],
+            "datas_especificas": [
+                {"data": "2030-03-04", "horarios": [{"inicio": "14:00", "fim": "15:30", "duracao_minutos": 30}]},
+                {"data": "2030-03-05", "horarios": []},
+            ],
+        },
+    )
+
+    class Consultations:
+        def find(self, *_):
+            return []
+
+    class Database:
+        def __getitem__(self, name):
+            assert name == "consultas"
+            return Consultations()
+
+    monkeypatch.setattr(consulta_crud, "get_database", lambda: Database())
+
+    slots = consulta_crud.listar_horarios_livres(
+        nutritionist_id,
+        datetime(2030, 3, 4).date(),
+        datetime(2030, 3, 6).date(),
+    )
+
+    por_dia = {}
+    for slot in slots:
+        por_dia.setdefault(slot["data_local"].isoformat(), []).append(slot["inicio"].strftime("%H:%M"))
+    assert por_dia == {
+        "2030-03-04": ["17:00", "17:30", "18:00"],
+        "2030-03-06": ["12:00"],
+    }
+
+
 def test_consultation_without_payment_link_waits_for_nutritionist_confirmation(
     monkeypatch,
 ):
@@ -960,7 +1029,7 @@ def test_patient_assessment_endpoint_returns_only_the_summary(client, monkeypatc
     monkeypatch.setattr(consulta_crud, "get_database", lambda: Database())
     monkeypatch.setattr(
         "security.buscar_usuario",
-        lambda _: {"id": patient_id, "nome": "Maria Souza", "perfil": "paciente"},
+        lambda *_, **__: {"id": patient_id, "nome": "Maria Souza", "perfil": "paciente"},
     )
     token = create_access_token(patient_id)
 
@@ -1051,7 +1120,7 @@ def test_patient_cannot_write_consultation_assessment(client, monkeypatch):
     patient_id = "507f1f77bcf86cd799439011"
     monkeypatch.setattr(
         "security.buscar_usuario",
-        lambda _: {"id": patient_id, "nome": "Maria Souza", "perfil": "paciente"},
+        lambda *_, **__: {"id": patient_id, "nome": "Maria Souza", "perfil": "paciente"},
     )
     monkeypatch.setattr(
         consulta_router,
@@ -1334,3 +1403,710 @@ def test_meal_requires_at_least_one_food():
     with pytest.raises(ValidationError):
         RefeicaoPlano(horario="07:00", nome="Café da manhã", alimentos=[])
 
+
+REPORT_2022 = {
+    "sexo_biologico": "feminino",
+    "idade_anos": 18,
+    "peso_kg": 46,
+    "altura_cm": 155,
+    "dobras": {
+        "tricipital": 30, "abdominal": 10, "subescapular": 15, "axilar_media": 16,
+        "coxa": 35, "toracica": 22, "suprailiaca": 13,
+    },
+    "circunferencias": {"braco_relaxado": 19, "quadril": 77, "abdomen": 59},
+}
+
+
+def test_anthropometry_matches_reference_report():
+    from antropometria import calcular_resultados
+
+    results = calcular_resultados(REPORT_2022)
+
+    assert results["imc"] == 19.1
+    assert results["classificacao_imc"] == "Adequado"
+    assert results["soma_dobras_metodo_mm"] == 141
+    assert round(results["densidade_corporal"], 2) == 1.04
+    assert 25 <= results["percentual_gordura"] <= 27
+    assert results["cmb_cm"] == 9.6
+    assert results["classificacao_cmb"] == "Desnutrição grave"
+    assert results["massa_residual_kg"] == 9.6
+    assert results["metodo_gordura"].startswith("Jackson & Pollock (7 dobras)")
+    assert round(results["massa_gordura_kg"] + results["massa_livre_gordura_kg"], 1) == 46
+
+
+def test_waist_hip_ratio_uses_age_and_sex_table():
+    from antropometria import calcular_resultados
+
+    results = calcular_resultados({**REPORT_2022, "circunferencias": {"cintura": 53, "quadril": 66}})
+
+    assert results["rcq"] == 0.8
+    assert results["risco_rcq"] == "Alto"
+    assert results["rce"] == 0.34
+    assert results["risco_rce"] == "Adequado"
+
+
+def test_body_fat_uses_three_skinfolds_when_seven_are_missing():
+    from antropometria import calcular_resultados
+
+    results = calcular_resultados({
+        **REPORT_2022,
+        "sexo_biologico": "masculino",
+        "dobras": {"toracica": 10, "abdominal": 20, "coxa": 15},
+    })
+
+    assert results["metodo_gordura"].startswith("Jackson & Pollock (3 dobras)")
+    assert results["percentual_gordura"] is not None
+
+
+def test_body_fat_is_not_estimated_without_enough_skinfolds():
+    from antropometria import calcular_resultados
+
+    results = calcular_resultados({**REPORT_2022, "dobras": {"tricipital": 30}})
+
+    assert results["percentual_gordura"] is None
+    assert results["massa_gordura_kg"] is None
+    assert results["soma_dobras_mm"] == 30
+
+
+def test_total_energy_expenditure_uses_activity_level():
+    from antropometria import calcular_resultados
+
+    medida = {**REPORT_2022, "sexo_biologico": "feminino", "idade_anos": 30, "peso_kg": 70, "altura_cm": 165}
+    sem_atividade = calcular_resultados(medida)
+    moderada = calcular_resultados({**medida, "nivel_atividade": "moderado"})
+
+    assert sem_atividade["tmb_kcal"] == 1420
+    assert sem_atividade["get_kcal"] is None
+    assert moderada["fator_atividade"] == 1.55
+    assert moderada["get_kcal"] == 2201
+
+
+def test_nutritionist_registers_measurements_for_linked_patient(client, monkeypatch):
+    main.app.dependency_overrides[medida_router.require_nutritionist] = lambda: NUTRITIONIST
+    monkeypatch.setattr(medida_router, "paciente_vinculado", lambda *_: True)
+    saved = []
+
+    def create(patient_id, nutritionist_id, measurement):
+        saved.append((patient_id, nutritionist_id, measurement.peso_kg, measurement.dobras.tricipital))
+        return {
+            **REPORT_2022,
+            "data_avaliacao": "2026-10-01",
+            "observacoes": "",
+            "id": "507f1f77bcf86cd799439020",
+            "paciente_id": patient_id,
+            "nutricionista_id": nutritionist_id,
+            "nutricionista_nome": "Amanda Ribeiro",
+            "dobras": {},
+            "circunferencias": {},
+            "resultados": {"imc": 19.1, "classificacao_imc": "Adequado"},
+        }
+
+    monkeypatch.setattr(medida_router, "criar_medida", create)
+    try:
+        response = client.post(f"/medidas/paciente/{PATIENT['id']}", json={**REPORT_2022, "data_avaliacao": "2026-10-01"})
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 201
+    assert response.json()["nutricionista_nome"] == "Amanda Ribeiro"
+    assert saved == [(PATIENT["id"], NUTRITIONIST["id"], 46, 30)]
+
+
+def test_nutritionist_cannot_register_measurements_for_unlinked_patient(client, monkeypatch):
+    main.app.dependency_overrides[medida_router.require_nutritionist] = lambda: NUTRITIONIST
+    monkeypatch.setattr(medida_router, "paciente_vinculado", lambda *_: False)
+    try:
+        response = client.post(f"/medidas/paciente/{PATIENT['id']}", json={**REPORT_2022, "data_avaliacao": "2026-10-01"})
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+
+
+def test_measurement_date_cannot_be_in_the_future(client, monkeypatch):
+    main.app.dependency_overrides[medida_router.require_nutritionist] = lambda: NUTRITIONIST
+    monkeypatch.setattr(medida_router, "paciente_vinculado", lambda *_: True)
+    try:
+        response = client.post(f"/medidas/paciente/{PATIENT['id']}", json={**REPORT_2022, "data_avaliacao": "2999-01-01"})
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+
+
+def test_patient_cannot_register_measurements(client):
+    main.app.dependency_overrides[medida_router.get_current_user] = lambda: PATIENT
+    try:
+        response = client.post(f"/medidas/paciente/{PATIENT['id']}", json={**REPORT_2022, "data_avaliacao": "2026-10-01"})
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+
+
+def test_patient_sees_own_measurements(client, monkeypatch):
+    main.app.dependency_overrides[medida_router.get_current_user] = lambda: PATIENT
+    monkeypatch.setattr(medida_router, "listar_medidas", lambda patient_id: [])
+    try:
+        response = client.get("/medidas/minhas")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+
+
+def test_nutritionist_only_sees_linked_patient_measurements(client, monkeypatch):
+    main.app.dependency_overrides[medida_router.require_nutritionist] = lambda: NUTRITIONIST
+    monkeypatch.setattr(medida_router, "paciente_vinculado", lambda *_: False)
+    try:
+        response = client.get(f"/medidas/paciente/{PATIENT['id']}")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+
+
+
+RECIPE = {
+    "titulo": "Panqueca de banana",
+    "categoria": "Café da manhã",
+    "tempo_preparo_min": 15,
+    "porcoes": 2,
+    "ingredientes": [
+        {"nome": "Banana, prata, crua", "alimento_id": "taco-182", "medida": "1 unidade", "gramas": 100},
+        {"nome": "Ovo, de galinha, inteiro, cru", "alimento_id": "taco-489", "medida": "2 unidades", "gramas": 100},
+        {"nome": " Canela a gosto "},
+    ],
+    "modo_preparo": "Amasse a banana, misture os ovos e doure dos dois lados.",
+    "planos_ids": ["507f1f77bcf86cd799439030", "507f1f77bcf86cd799439030"],
+}
+
+
+def test_nutritionist_creates_recipe_linked_to_plan(client, monkeypatch):
+    main.app.dependency_overrides[receita_router.require_nutritionist] = lambda: NUTRITIONIST
+    saved = []
+
+    def create(nutritionist_id, recipe):
+        saved.append((nutritionist_id, [item.nome for item in recipe.ingredientes], recipe.planos_ids))
+        return {
+            **recipe.model_dump(exclude={"planos_ids", "ingredientes"}),
+            **receita_crud.calcular_nutricao([item.model_dump() for item in recipe.ingredientes], recipe.porcoes),
+            "id": "507f1f77bcf86cd799439040",
+            "nutricionista_id": nutritionist_id,
+            "nutricionista_nome": "Amanda Ribeiro",
+            "planos": [{"id": "507f1f77bcf86cd799439030", "titulo": "Plano leve", "paciente_nome": "Maria Souza"}],
+            "criada_em": "2026-10-08T12:00:00Z",
+        }
+
+    monkeypatch.setattr(receita_router, "criar_receita", create)
+    try:
+        response = client.post("/receitas", json=RECIPE)
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 201
+    assert response.json()["planos"][0]["titulo"] == "Plano leve"
+    assert saved == [(NUTRITIONIST["id"], ["Banana, prata, crua", "Ovo, de galinha, inteiro, cru", "Canela a gosto"], ["507f1f77bcf86cd799439030"])]
+
+
+def test_recipe_cannot_be_linked_to_another_nutritionist_plan(client, monkeypatch):
+    main.app.dependency_overrides[receita_router.require_nutritionist] = lambda: NUTRITIONIST
+    def reject(*_):
+        raise ValueError("Vincule a receita apenas a planos alimentares seus.")
+
+    monkeypatch.setattr(receita_router, "criar_receita", reject)
+    try:
+        response = client.post("/receitas", json=RECIPE)
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+
+
+def test_patient_cannot_create_recipe(client):
+    main.app.dependency_overrides[receita_router.get_current_user] = lambda: PATIENT
+    try:
+        response = client.post("/receitas", json=RECIPE)
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+
+
+def test_patient_only_sees_recipes_from_own_plans(monkeypatch):
+    plan_id = ObjectId("507f1f77bcf86cd799439030")
+    queries = []
+
+    class Cursor(list):
+        def sort(self, *_):
+            return self
+
+    class Plans:
+        def find(self, query, *_):
+            queries.append(("planos", query))
+            if query == {"paciente_id": ObjectId(PATIENT["id"])}:
+                return [{"_id": plan_id}]
+            return [{"_id": plan_id, "titulo": "Plano leve", "paciente_id": ObjectId(PATIENT["id"])}]
+
+    class Recipes:
+        def find(self, query):
+            queries.append(("receitas", query))
+            return Cursor([{
+                **{chave: valor for chave, valor in RECIPE.items() if chave != "planos_ids"},
+                "_id": ObjectId("507f1f77bcf86cd799439040"),
+                "nutricionista_id": ObjectId(NUTRITIONIST["id"]),
+                "planos_ids": [plan_id],
+                "criada_em": datetime(2026, 10, 8, tzinfo=timezone.utc),
+            }])
+
+    class Users:
+        def find(self, *_):
+            return [
+                {"_id": ObjectId(NUTRITIONIST["id"]), "nome": "Amanda Ribeiro"},
+                {"_id": ObjectId(PATIENT["id"]), "nome": "Maria Souza"},
+            ]
+
+    class Database:
+        def __getitem__(self, name):
+            return {"planos": Plans(), "receitas": Recipes(), "usuarios": Users()}[name]
+
+    monkeypatch.setattr(receita_crud, "get_database", lambda: Database())
+
+    recipes = receita_crud.listar_receitas(PATIENT)
+
+    assert ("receitas", {"planos_ids": {"$in": [plan_id]}}) in queries
+    assert recipes[0]["planos"] == [{"id": str(plan_id), "titulo": "Plano leve", "paciente_nome": "Maria Souza"}]
+    assert recipes[0]["nutricionista_nome"] == "Amanda Ribeiro"
+
+
+def test_recipe_nutrition_is_calculated_from_taco():
+    result = receita_crud.calcular_nutricao(RECIPE["ingredientes"], 2)
+
+    assert result["ingredientes_calculados"] == 2
+    assert result["nutricao_total"]["energia_kcal"] == 241.4
+    assert result["nutricao_total"]["proteina_g"] == 14.3
+    assert result["nutricao_total"]["sodio_mg"] == 167.9
+    assert result["nutricao_porcao"]["energia_kcal"] == 120.7
+    assert result["ingredientes"][0]["energia_kcal"] == 98.2
+    assert result["ingredientes"][2]["energia_kcal"] is None
+
+
+def test_recipe_rejects_food_outside_taco(client):
+    main.app.dependency_overrides[receita_router.require_nutritionist] = lambda: NUTRITIONIST
+    try:
+        response = client.post("/receitas", json={
+            **RECIPE,
+            "planos_ids": [],
+            "ingredientes": [{"nome": "Inexistente", "alimento_id": "taco-999999", "gramas": 50}],
+        })
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+    assert "TACO" in response.json()["detail"]
+
+
+def test_taco_ingredient_requires_grams():
+    with pytest.raises(ValidationError):
+        ReceitaSalvar(**{**RECIPE, "ingredientes": [{"nome": "Banana", "alimento_id": "taco-182"}]})
+
+
+def _nomes_encontrados(client, busca):
+    response = client.get("/alimentos", params={"busca": busca, "limit": 100})
+    assert response.status_code == 200
+    return [food["name"] for food in response.json()["items"]]
+
+
+def test_food_search_shows_taco_name_for_popular_synonym(client):
+    nomes = _nomes_encontrados(client, "tapioca")
+
+    assert nomes[0] == "Tapioca, com manteiga"
+    assert "Fécula, de mandioca" in nomes
+    assert "Polvilho, doce" in nomes
+
+
+def test_food_search_accepts_words_in_any_order(client):
+    nomes = _nomes_encontrados(client, "peito de frango")
+
+    assert nomes
+    assert all("Frango" in nome and "peito" in nome for nome in nomes)
+
+
+def test_food_search_regional_names(client):
+    assert "Mandioca, cozida" in _nomes_encontrados(client, "macaxeira")
+    assert "Batata, baroa, cozida" in _nomes_encontrados(client, "mandioquinha")
+    assert "Toucinho, frito" in _nomes_encontrados(client, "bacon")
+    assert "Fécula, de mandioca" in _nomes_encontrados(client, "goma de tapioca")
+
+
+def test_catalog_includes_ibge_household_measures(client):
+    response = client.get("/alimentos/taco-489")
+
+    assert response.status_code == 200
+    portions = {portion["label"]: portion["gram_weight"] for portion in response.json()["portions"]}
+    assert portions["100 g (base TACO)"] == 100
+    assert portions["Unidade · 45 g"] == 45
+
+
+def test_nutritionist_registers_own_household_measure(client, monkeypatch):
+    main.app.dependency_overrides[alimento_router.require_nutritionist] = lambda: NUTRITIONIST
+    saved = []
+
+    def create(nutritionist_id, food_id, measure):
+        saved.append((nutritionist_id, food_id, measure.rotulo, measure.gramas))
+        return {"id": "507f1f77bcf86cd799439050", "alimento_id": food_id, "rotulo": measure.rotulo, "gramas": measure.gramas}
+
+    monkeypatch.setattr(alimento_router, "criar_medida_caseira", create)
+    try:
+        response = client.post("/alimentos/taco-146/medidas", json={"rotulo": "  colher de sopa   cheia ", "gramas": 12})
+        missing = client.post("/alimentos/taco-999999/medidas", json={"rotulo": "Colher", "gramas": 12})
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 201
+    assert saved == [(NUTRITIONIST["id"], "taco-146", "Colher de sopa cheia", 12)]
+    assert missing.status_code == 404
+
+
+def test_patient_cannot_register_household_measure(client):
+    import security
+
+    main.app.dependency_overrides[security.get_current_user] = lambda: PATIENT
+    try:
+        response = client.post("/alimentos/taco-146/medidas", json={"rotulo": "Colher", "gramas": 12})
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+
+
+def test_body_fat_uses_chosen_pollock_protocol():
+    from antropometria import calcular_resultados
+
+    sete = calcular_resultados({**REPORT_2022, "protocolo_gordura": "pollock7"})
+    tres = calcular_resultados({**REPORT_2022, "protocolo_gordura": "pollock3"})
+
+    assert sete["protocolo_gordura"] == "pollock7"
+    assert sete["metodo_gordura"].startswith("Jackson & Pollock (7 dobras)")
+    assert tres["protocolo_gordura"] == "pollock3"
+    assert tres["metodo_gordura"].startswith("Jackson & Pollock (3 dobras)")
+    assert sete["percentual_gordura"] == sete["percentual_gordura_pollock7"]
+    assert tres["percentual_gordura"] == tres["percentual_gordura_pollock3"]
+    assert sete["percentual_gordura_pollock3"] == tres["percentual_gordura"]
+    assert sete["percentual_gordura"] != tres["percentual_gordura"]
+
+
+def test_chosen_protocol_reports_missing_skinfolds():
+    from antropometria import calcular_resultados
+
+    results = calcular_resultados({
+        **REPORT_2022,
+        "protocolo_gordura": "pollock7",
+        "dobras": {"tricipital": 20, "suprailiaca": 18, "coxa": 25},
+    })
+
+    assert results["percentual_gordura"] is None
+    assert results["percentual_gordura_pollock3"] is not None
+    assert results["dobras_faltando"] == ["torácica", "axilar média", "subescapular", "abdominal"]
+
+
+def test_plan_food_keeps_household_measure_and_calculates_from_grams():
+    option = OpcaoAlimento(
+        nome="Arroz",
+        quantidade=75,
+        medida="g",
+        calorias=0,
+        alimento_id="taco-5",
+        quantidade_caseira=3,
+        medida_caseira="Colher de sopa",
+    )
+
+    assert option.quantidade_caseira == 3
+    assert option.medida_caseira == "Colher de sopa"
+    assert option.medida == "g"
+    assert option.calorias > 0
+
+
+def test_linked_patient_sends_message_to_nutritionist(client, monkeypatch):
+    main.app.dependency_overrides[mensagem_router.get_current_user] = lambda: PATIENT
+    monkeypatch.setattr(mensagem_router, "pode_conversar", lambda *_: True)
+    sent = []
+
+    def send(user, contact_id, text):
+        sent.append((user["id"], contact_id, text))
+        return {
+            "id": "507f1f77bcf86cd799439060",
+            "remetente_id": user["id"],
+            "destinatario_id": contact_id,
+            "texto": text,
+            "criada_em": "2026-10-08T12:00:00Z",
+            "lida_em": None,
+            "minha": True,
+        }
+
+    monkeypatch.setattr(mensagem_router, "enviar_mensagem", send)
+    try:
+        response = client.post(f"/mensagens/{NUTRITIONIST['id']}", json={"texto": "  Posso trocar o almoço?  "})
+        empty = client.post(f"/mensagens/{NUTRITIONIST['id']}", json={"texto": "   "})
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 201
+    assert sent == [(PATIENT["id"], NUTRITIONIST["id"], "Posso trocar o almoço?")]
+    assert empty.status_code == 422
+
+
+def test_message_requires_link_between_patient_and_nutritionist(client, monkeypatch):
+    main.app.dependency_overrides[mensagem_router.get_current_user] = lambda: PATIENT
+    monkeypatch.setattr(mensagem_router, "pode_conversar", lambda *_: False)
+    try:
+        response = client.post(f"/mensagens/{NUTRITIONIST['id']}", json={"texto": "Oi"})
+        history = client.get(f"/mensagens/{NUTRITIONIST['id']}")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+    assert history.status_code == 403
+
+
+def test_admin_cannot_use_chat(client):
+    main.app.dependency_overrides[mensagem_router.get_current_user] = lambda: {**PATIENT, "perfil": "administrador"}
+    try:
+        response = client.get("/mensagens/conversas")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+
+
+def test_chat_link_comes_from_confirmed_consultation_or_plan(monkeypatch):
+    patient_id = ObjectId(PATIENT["id"])
+    nutritionist_id = ObjectId(NUTRITIONIST["id"])
+    other_id = ObjectId("507f1f77bcf86cd799439099")
+
+    class Consultations:
+        def find(self, query, *_):
+            assert query["status"] == "confirmada"
+            return [{"paciente_id": patient_id, "nutricionista_id": nutritionist_id}]
+
+    class Plans:
+        def find(self, query, *_):
+            return []
+
+    class Database:
+        def __getitem__(self, name):
+            return {"consultas": Consultations(), "planos": Plans()}[name]
+
+    monkeypatch.setattr(mensagem_crud, "get_database", lambda: Database())
+
+    assert mensagem_crud.pode_conversar(PATIENT, NUTRITIONIST["id"])
+    assert mensagem_crud.pode_conversar(NUTRITIONIST, PATIENT["id"])
+    assert not mensagem_crud.pode_conversar(PATIENT, str(other_id))
+    assert not mensagem_crud.pode_conversar(PATIENT, "invalido")
+
+
+def test_opening_conversation_marks_received_messages_as_read(monkeypatch):
+    updates = []
+    message = {
+        "_id": ObjectId("507f1f77bcf86cd799439061"),
+        "remetente_id": ObjectId(NUTRITIONIST["id"]),
+        "destinatario_id": ObjectId(PATIENT["id"]),
+        "texto": "Bom dia!",
+        "criada_em": datetime(2026, 10, 8, 12, tzinfo=timezone.utc),
+        "lida_em": None,
+    }
+
+    class Cursor(list):
+        def sort(self, *_):
+            return self
+
+        def limit(self, *_):
+            return self
+
+    class Messages:
+        def update_many(self, query, change):
+            updates.append(query)
+
+        def find(self, *_):
+            return Cursor([message])
+
+    class Database:
+        def __getitem__(self, name):
+            assert name == "mensagens"
+            return Messages()
+
+    monkeypatch.setattr(mensagem_crud, "get_database", lambda: Database())
+
+    messages = mensagem_crud.listar_mensagens(PATIENT, NUTRITIONIST["id"])
+
+    assert updates == [{"remetente_id": ObjectId(NUTRITIONIST["id"]), "destinatario_id": ObjectId(PATIENT["id"]), "lida_em": None}]
+    assert messages[0]["texto"] == "Bom dia!"
+    assert messages[0]["minha"] is False
+
+
+def test_login_is_blocked_after_repeated_failures(client, monkeypatch):
+    from routers import auth_router
+
+    monkeypatch.setattr(auth_router, "buscar_usuario_com_senha", lambda _: {"_id": ObjectId(PATIENT["id"]), "senha_hash": "x", "ativo": True})
+    monkeypatch.setattr(auth_router, "verify_password", lambda senha, _: senha == "correta123")
+    respostas = [client.post("/auth/login", json={"email": "maria@teste.com", "senha": "errada"}).status_code for _ in range(5)]
+    bloqueada = client.post("/auth/login", json={"email": "maria@teste.com", "senha": "correta123"})
+
+    assert respostas == [401] * 5
+    assert bloqueada.status_code == 429
+    assert "Retry-After" in bloqueada.headers
+
+
+def test_login_checks_password_even_when_email_does_not_exist(client, monkeypatch):
+    from routers import auth_router
+
+    verificados = []
+    monkeypatch.setattr(auth_router, "buscar_usuario_com_senha", lambda _: None)
+    monkeypatch.setattr(auth_router, "verify_password", lambda senha, hash_: verificados.append(hash_) or False)
+    response = client.post("/auth/login", json={"email": "ninguem@teste.com", "senha": "qualquer"})
+
+    assert response.status_code == 401
+    assert verificados == [auth_router.SENHA_FICTICIA]
+
+
+def test_tokens_issued_before_password_change_are_rejected(monkeypatch):
+    import security
+    from fastapi import HTTPException
+    from fastapi.security import HTTPAuthorizationCredentials
+
+    token = create_access_token(PATIENT["id"])
+    momento = datetime.now(timezone.utc)
+    monkeypatch.setattr(
+        "security.buscar_usuario",
+        lambda *_, **__: {**PATIENT, "senha_alterada_em": momento.replace(year=momento.year + 1)},
+    )
+    with pytest.raises(HTTPException) as erro:
+        security.get_current_user(HTTPAuthorizationCredentials(scheme="Bearer", credentials=token))
+    assert erro.value.status_code == 401
+
+    monkeypatch.setattr(
+        "security.buscar_usuario",
+        lambda *_, **__: {**PATIENT, "senha_alterada_em": momento.replace(year=momento.year - 1)},
+    )
+    usuario = security.get_current_user(HTTPAuthorizationCredentials(scheme="Bearer", credentials=token))
+    assert usuario["id"] == PATIENT["id"]
+    assert "senha_alterada_em" not in usuario
+
+
+def test_api_sends_security_headers(client):
+    response = client.get("/alimentos/categorias")
+
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+
+
+def test_listing_plans_fetches_names_in_a_single_query(monkeypatch):
+    patient_id = ObjectId(PATIENT["id"])
+    nutritionist_id = ObjectId(NUTRITIONIST["id"])
+    calls = {"find": 0, "find_one": 0}
+
+    class Cursor(list):
+        def sort(self, *_):
+            return self
+
+    class Plans:
+        def find(self, *_):
+            return Cursor([
+                {"_id": ObjectId(), "paciente_id": patient_id, "nutricionista_id": nutritionist_id, "titulo": f"Plano {n}",
+                 "descricao": "d", "refeicoes": []}
+                for n in range(3)
+            ])
+
+    class Users:
+        def find(self, *_):
+            calls["find"] += 1
+            return [{"_id": patient_id, "nome": "Maria Souza"}, {"_id": nutritionist_id, "nome": "Amanda Ribeiro"}]
+
+        def find_one(self, *_):
+            calls["find_one"] += 1
+            return None
+
+    class Database:
+        def __getitem__(self, name):
+            return {"planos": Plans(), "usuarios": Users()}[name]
+
+    monkeypatch.setattr(plano_crud, "get_database", lambda: Database())
+
+    plans = plano_crud.listar_planos(NUTRITIONIST)
+
+    assert calls == {"find": 1, "find_one": 0}
+    assert [plan["paciente_nome"] for plan in plans] == ["Maria Souza"] * 3
+
+
+def test_patient_fills_own_anamnesis(client, monkeypatch):
+    main.app.dependency_overrides[anamnese_router.get_current_user] = lambda: PATIENT
+    saved = []
+
+    def save(patient_id, user, anamnesis):
+        saved.append((patient_id, user["perfil"], anamnesis.objetivo, anamnesis.restricoes))
+        return {**anamnesis.model_dump(), "paciente_id": patient_id, "preenchida": True}
+
+    monkeypatch.setattr(anamnese_router, "salvar_anamnese", save)
+    try:
+        response = client.put("/anamnese/minha", json={"objetivo": "  Emagrecer  ", "restricoes": ["sem_lactose"], "horario_acorda": "06:30"})
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert saved == [(PATIENT["id"], "paciente", "Emagrecer", ["sem_lactose"])]
+
+
+def test_anamnesis_rejects_invalid_values(client):
+    main.app.dependency_overrides[anamnese_router.get_current_user] = lambda: PATIENT
+    try:
+        response = client.put("/anamnese/minha", json={"horario_acorda": "25:00", "qualidade_sono": "otima"})
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+
+
+def test_nutritionist_cannot_read_unlinked_patient_anamnesis(client, monkeypatch):
+    main.app.dependency_overrides[anamnese_router.require_nutritionist] = lambda: NUTRITIONIST
+    monkeypatch.setattr(anamnese_router, "paciente_vinculado", lambda *_: False)
+    try:
+        response = client.get(f"/anamnese/paciente/{PATIENT['id']}")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+
+
+def test_nutritionist_cannot_use_patient_anamnesis_route(client):
+    main.app.dependency_overrides[anamnese_router.get_current_user] = lambda: NUTRITIONIST
+    try:
+        response = client.get("/anamnese/minha")
+    finally:
+        main.app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+
+
+def test_patient_save_keeps_nutritionist_notes_private(monkeypatch):
+    from schemas.anamnese_schema import AnamneseSalvar
+
+    stored = {"paciente_id": ObjectId(PATIENT["id"]), "observacoes_nutricionista": "Investigar resistência à insulina."}
+
+    class Anamneses:
+        def find_one_and_update(self, query, update, upsert, return_document):
+            stored.update(update["$set"])
+            return stored
+
+        def find_one(self, query):
+            return stored
+
+    monkeypatch.setattr(anamnese_crud, "get_database", lambda: {"anamneses": Anamneses()})
+
+    patient_view = anamnese_crud.salvar_anamnese(PATIENT["id"], PATIENT, AnamneseSalvar(objetivo="Ganhar massa", observacoes_nutricionista="tentativa"))
+    nutritionist_view = anamnese_crud.buscar_anamnese(PATIENT["id"], "nutricionista")
+
+    assert patient_view["observacoes_nutricionista"] == ""
+    assert patient_view["atualizada_por_perfil"] == "paciente"
+    assert nutritionist_view["observacoes_nutricionista"] == "Investigar resistência à insulina."
+    assert nutritionist_view["objetivo"] == "Ganhar massa"

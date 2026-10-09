@@ -19,21 +19,19 @@ def salvar_disponibilidade(
     nutricionista: dict,
     disponibilidade: DisponibilidadeUpdate,
 ) -> dict:
-    get_database()["usuarios"].update_one(
-        {"_id": ObjectId(nutricionista["id"]), "perfil": "nutricionista"},
-        {
-            "$set": {
-                "fuso_horario": disponibilidade.fuso_horario,
-                "horarios": [
-                    horario.model_dump() for horario in disponibilidade.horarios
-                ],
-            }
-        },
-    )
-    return {
+    dados = {
         "fuso_horario": disponibilidade.fuso_horario,
         "horarios": [horario.model_dump() for horario in disponibilidade.horarios],
+        "datas_especificas": [
+            {**item.model_dump(), "data": item.data.isoformat()}
+            for item in sorted(disponibilidade.datas_especificas, key=lambda item: item.data)
+        ],
     }
+    get_database()["usuarios"].update_one(
+        {"_id": ObjectId(nutricionista["id"]), "perfil": "nutricionista"},
+        {"$set": dados},
+    )
+    return dados
 
 
 def obter_disponibilidade(nutricionista_id: str) -> dict | None:
@@ -45,13 +43,14 @@ def obter_disponibilidade(nutricionista_id: str) -> dict | None:
             "perfil": "nutricionista",
             "ativo": {"$ne": False},
         },
-        {"fuso_horario": 1, "horarios": 1},
+        {"fuso_horario": 1, "horarios": 1, "datas_especificas": 1},
     )
     if nutritionist is None:
         return None
     return {
         "fuso_horario": nutritionist.get("fuso_horario", "America/Sao_Paulo"),
         "horarios": nutritionist.get("horarios", []),
+        "datas_especificas": nutritionist.get("datas_especificas", []),
     }
 
 
@@ -84,13 +83,15 @@ def listar_horarios_livres(
         for value in busy
     }
 
+    ajustes = {item["data"]: item["horarios"] for item in availability["datas_especificas"]}
     slots = []
     now = datetime.now(timezone.utc)
     current_day = inicio
     while current_day <= fim:
-        for window in availability["horarios"]:
-            if window["dia_semana"] != current_day.weekday():
-                continue
+        windows = ajustes.get(current_day.isoformat())
+        if windows is None:
+            windows = [window for window in availability["horarios"] if window["dia_semana"] == current_day.weekday()]
+        for window in windows:
             start_hour, start_minute = map(int, window["inicio"].split(":"))
             end_hour, end_minute = map(int, window["fim"].split(":"))
             slot = datetime.combine(
@@ -253,12 +254,17 @@ def salvar_avaliacao_consulta(
 def _serializar_consulta(
     consulta: dict,
     incluir_resumo_avaliacao: bool = False,
+    nomes: dict | None = None,
 ) -> dict:
-    database = get_database()
-    patient = database["usuarios"].find_one({"_id": consulta["paciente_id"]})
-    professional = database["usuarios"].find_one(
-        {"_id": consulta["nutricionista_id"]}
-    )
+    if nomes is None:
+        database = get_database()
+        patient = database["usuarios"].find_one({"_id": consulta["paciente_id"]})
+        professional = database["usuarios"].find_one(
+            {"_id": consulta["nutricionista_id"]}
+        )
+    else:
+        patient = {"nome": nomes[consulta["paciente_id"]]} if consulta["paciente_id"] in nomes else None
+        professional = {"nome": nomes[consulta["nutricionista_id"]]} if consulta["nutricionista_id"] in nomes else None
     result = {
         "id": str(consulta["_id"]),
         "paciente_id": str(consulta["paciente_id"]),
@@ -279,11 +285,18 @@ def _serializar_consulta(
 def listar_consultas(usuario: dict) -> list[dict]:
     user_id = ObjectId(usuario["id"])
     field = "nutricionista_id" if usuario["perfil"] == "nutricionista" else "paciente_id"
-    appointments = get_database()["consultas"].find({field: user_id}).sort("inicio", 1)
+    database = get_database()
+    appointments = list(database["consultas"].find({field: user_id}).sort("inicio", 1))
+    ids = {appointment["paciente_id"] for appointment in appointments} | {appointment["nutricionista_id"] for appointment in appointments}
+    nomes = {
+        pessoa["_id"]: pessoa["nome"]
+        for pessoa in database["usuarios"].find({"_id": {"$in": list(ids)}}, {"nome": 1})
+    } if ids else {}
     return [
         _serializar_consulta(
             appointment,
             incluir_resumo_avaliacao=usuario["perfil"] == "paciente",
+            nomes=nomes,
         )
         for appointment in appointments
     ]

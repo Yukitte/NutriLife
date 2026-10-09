@@ -3,35 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pacientes | NutriLife</title>
+    <title>Minha anamnese | NutriLife</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../css/styles.css">
 </head>
-<body data-page="patients">
+<body data-page="anamnesis">
     <div class="dashboard-shell">
-        <div data-component="app-sidebar" data-raiz="../" data-ativo="patients-nav"></div>
+        <div data-component="app-sidebar" data-raiz="../" data-ativo="anamnesis-nav"></div>
 
-        <main class="dashboard-main">
+        <main class="dashboard-main anamnesis-page">
             <header class="dashboard-header">
                 <div>
-                    <span class="eyebrow">Área profissional</span>
-                    <h1>Pacientes</h1>
-                    <p>Olá, <span id="user-name">Usuário</span>.</p>
+                    <span class="eyebrow">Ficha de saúde</span>
+                    <h1 id="anamnesis-title">Minha anamnese</h1>
+                    <p id="anamnesis-subtitle">Conte um pouco sobre a sua saúde, rotina e alimentação. Seu nutricionista usa essas respostas para montar um plano do seu jeito.</p>
                 </div>
-                <span class="btn btn--primary" id="user-role">Nutricionista</span>
             </header>
             <p id="dashboard-status" class="dashboard-status" role="alert" hidden></p>
 
-            <section class="dashboard-grid">
-                <article class="panel">
-                    <h3>Pacientes cadastrados</h3>
-                    <ul id="patients-list" class="list" aria-live="polite">
-                        <li>Carregando pacientes...</li>
-                    </ul>
-                </article>
+            <section class="panel anamnesis-status">
+                <div>
+                    <strong id="anamnesis-progress">Carregando...</strong>
+                    <p class="item-meta" id="anamnesis-updated"></p>
+                </div>
+                <div class="anamnesis-progress" aria-hidden="true"><span id="anamnesis-progress-bar"></span></div>
             </section>
+
+            <form id="anamnesis-form" class="measure-form anamnesis-form"></form>
         </main>
     </div>
     <div data-component="footer" data-raiz="../"></div>

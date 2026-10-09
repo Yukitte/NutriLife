@@ -14,11 +14,44 @@ class HorarioDisponivel(BaseModel):
     duracao_minutos: int = Field(default=60, ge=15, le=180)
 
 
+class HorarioDoDia(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    inicio: str = Field(pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+    fim: str = Field(pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+    duracao_minutos: int = Field(default=60, ge=15, le=180)
+
+
+class DataEspecifica(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    data: date
+    horarios: list[HorarioDoDia] = Field(default_factory=list, max_length=6)
+
+    @field_validator("horarios")
+    @classmethod
+    def validar_periodos(cls, value: list[HorarioDoDia]):
+        windows = sorted((availability.inicio, availability.fim) for availability in value)
+        if any(start >= end for start, end in windows):
+            raise ValueError("O horário final deve ser posterior ao inicial.")
+        if any(current[0] < previous[1] for previous, current in zip(windows, windows[1:])):
+            raise ValueError("Horários no mesmo dia não podem se sobrepor.")
+        return value
+
+
 class DisponibilidadeUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     fuso_horario: str = "America/Sao_Paulo"
     horarios: list[HorarioDisponivel] = Field(max_length=42)
+    datas_especificas: list[DataEspecifica] = Field(default_factory=list, max_length=120)
+
+    @field_validator("datas_especificas")
+    @classmethod
+    def validar_datas_unicas(cls, value: list[DataEspecifica]):
+        if len({item.data for item in value}) != len(value):
+            raise ValueError("Cada data só pode ter um ajuste.")
+        return value
 
     @field_validator("fuso_horario")
     @classmethod

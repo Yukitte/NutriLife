@@ -79,7 +79,7 @@ def redefinir_senha(usuario_id: str, nonce: str, senha_hash: str) -> bool:
             "reset_nonce_hash": sha256(nonce.encode()).hexdigest(),
         },
         {
-            "$set": {"senha_hash": senha_hash},
+            "$set": {"senha_hash": senha_hash, "senha_alterada_em": datetime.now(timezone.utc)},
             "$unset": {"reset_nonce_hash": ""},
         },
     )
@@ -89,7 +89,7 @@ def redefinir_senha(usuario_id: str, nonce: str, senha_hash: str) -> bool:
 def redefinir_senha_por_cpf(email: str, cpf: str, senha_hash: str) -> bool:
     result = get_database()["usuarios"].update_one(
         {"email": email.lower(), "cpf_hash": hash_cpf(cpf), "ativo": {"$ne": False}},
-        {"$set": {"senha_hash": senha_hash}, "$unset": {"reset_nonce_hash": ""}},
+        {"$set": {"senha_hash": senha_hash, "senha_alterada_em": datetime.now(timezone.utc)}, "$unset": {"reset_nonce_hash": ""}},
     )
     return result.matched_count == 1
 
@@ -238,11 +238,16 @@ def _serializar_profissional(professional: dict) -> dict:
     }
 
 
-def buscar_usuario(usuario_id: str) -> dict | None:
+def buscar_usuario(usuario_id: str, incluir_sessao: bool = False) -> dict | None:
     if not ObjectId.is_valid(usuario_id):
         return None
     usuario = get_database()["usuarios"].find_one({"_id": ObjectId(usuario_id)})
-    return serializar_usuario(usuario) if usuario else None
+    if not usuario:
+        return None
+    serializado = serializar_usuario(usuario)
+    if incluir_sessao:
+        serializado["senha_alterada_em"] = usuario.get("senha_alterada_em")
+    return serializado
 
 
 def listar_usuarios_administrador() -> list[dict]:

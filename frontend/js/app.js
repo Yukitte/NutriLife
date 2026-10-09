@@ -302,13 +302,15 @@ function nutrientText(value, unit) {
 function updateCatalogOption(row) {
     const food = row.catalogFood;
     if (!food) return;
-    const grams = Number(row.querySelector('[name="quantidade"]').value);
+    const grams = row.seletorMedida.gramas();
     const summary = row.querySelector(".food-nutrition-summary");
     const calories = row.querySelector('[name="calorias"]');
-    if (!Number.isFinite(grams) || grams <= 0 || grams > 10000) {
-        summary.textContent = "Informe uma quantidade entre 0,01 e 10.000 g.";
+    if (!grams || grams > 10000) {
+        summary.textContent = "Informe uma quantidade que resulte entre 0,1 e 10.000 g.";
+        delete row.dataset.gramas;
         return;
     }
+    row.dataset.gramas = String(grams);
 
     const nutrients = food.nutrients_per_100g;
     const factor = grams / 100;
@@ -326,6 +328,7 @@ function updateCatalogOption(row) {
             : String(value * factor);
     });
     summary.textContent = [
+        `${grams.toLocaleString("pt-BR")} g`,
         `Energia: ${nutrientText(row.dataset.energiaKcal || null, "kcal")}`,
         `Proteína: ${nutrientText(row.dataset.proteina_g || null, "g")}`,
         `Carboidratos: ${nutrientText(row.dataset.carboidrato_g || null, "g")}`,
@@ -340,39 +343,29 @@ function selectCatalogFood(row, food, savedOption) {
     const measure = row.querySelector('[name="medida"]');
     const quantity = row.querySelector('[name="quantidade"]');
     const calories = row.querySelector('[name="calorias"]');
-    const portions = row.querySelector(".food-portion-select");
     const saved = savedOption || {};
+    const savedMeasure = saved.medida_caseira && saved.quantidade_caseira ? saved.medida_caseira : null;
     row.catalogFood = food;
     row.dataset.foodId = food.id;
     row.dataset.foodCategory = food.category;
     foodName.value = food.name;
-
-    const portionOptions = [
-        { label: "100 g (referência)", gram_weight: 100 },
-        ...food.portions,
-    ];
-    portions.replaceChildren(...portionOptions.map((portion) =>
-        new Option(portion.label, String(portion.gram_weight))));
-    const savedPortionIndex = portionOptions.findIndex(
-        (portion) => portion.label === saved.porcao,
-    );
-    portions.selectedIndex = savedPortionIndex >= 0 ? savedPortionIndex : 0;
-    portions.disabled = false;
+    measure.hidden = true;
     measure.value = "g";
-    measure.readOnly = true;
-    quantity.value = String(saved.quantidade || portionOptions[portions.selectedIndex].gram_weight);
+    row.seletorMedida.select.hidden = false;
     quantity.max = "10000";
-    quantity.step = "0.01";
+    quantity.step = "any";
     calories.readOnly = true;
-    row.dataset.portion = saved.porcao || portionOptions[portions.selectedIndex].label;
-    updateCatalogOption(row);
+    row.seletorMedida.vincular(food, savedMeasure, (achou) => {
+        quantity.value = String(achou ? saved.quantidade_caseira : saved.quantidade || 100);
+        updateCatalogOption(row);
+    });
 }
 
 function clearCatalogFood(row) {
     row.catalogFood = null;
     delete row.dataset.foodId;
     delete row.dataset.foodCategory;
-    delete row.dataset.portion;
+    delete row.dataset.gramas;
     [
         "energiaKcal",
         "proteina_g",
@@ -381,11 +374,11 @@ function clearCatalogFood(row) {
         "fibra_g",
         "sodio_mg",
     ].forEach((key) => delete row.dataset[key]);
-    row.querySelector(".food-portion-select").replaceChildren(
-        new Option("Selecione um alimento do catálogo", ""),
-    );
-    row.querySelector(".food-portion-select").disabled = true;
-    row.querySelector('[name="medida"]').readOnly = false;
+    row.seletorMedida.vincular(null);
+    row.seletorMedida.select.hidden = true;
+    const measure = row.querySelector('[name="medida"]');
+    measure.hidden = false;
+    if (measure.value === "g") measure.value = "";
     row.querySelector('[name="calorias"]').readOnly = false;
     row.querySelector(".food-nutrition-summary").textContent = "";
 }
@@ -489,10 +482,6 @@ function appendMealEditor(container, initialMeal) {
         measure.setAttribute("aria-label", "Medida");
         measure.value = data.medida || "";
         measure.required = true;
-        const portions = document.createElement("select");
-        portions.className = "food-portion-select";
-        portions.disabled = true;
-        portions.add(new Option("Selecione um alimento do catálogo", ""));
         const calories = document.createElement("input");
         calories.name = "calorias";
         calories.type = "number";
@@ -537,6 +526,7 @@ function appendMealEditor(container, initialMeal) {
                         `${food.name} · ${food.category}`,
                     );
                     result.type = "button";
+                    result.addEventListener("mousedown", (event) => event.preventDefault());
                     result.addEventListener("click", () => {
                         selectCatalogFood(row, food);
                         results.replaceChildren();
@@ -569,13 +559,11 @@ function appendMealEditor(container, initialMeal) {
             debounce = window.setTimeout(() => runSearch(false), 250);
         });
         category.addEventListener("change", () => runSearch(false));
-        portions.addEventListener("change", () => {
-            const selected = portions.selectedOptions[0];
-            if (!selected || !selected.value) return;
-            quantity.value = selected.value;
-            row.dataset.portion = selected.textContent || "";
-            updateCatalogOption(row);
+        row.seletorMedida = criarSeletorMedida(quantity, () => {
+            if (row.dataset.foodId) updateCatalogOption(row);
+            row.dispatchEvent(new Event("input", { bubbles: true }));
         });
+        row.seletorMedida.select.hidden = true;
         quantity.addEventListener("input", () => {
             if (row.dataset.foodId) updateCatalogOption(row);
         });
@@ -585,16 +573,18 @@ function appendMealEditor(container, initialMeal) {
         if (data.alimento_id) {
             row.dataset.foodId = data.alimento_id;
             row.dataset.foodCategory = data.categoria || "";
-            row.dataset.portion = data.porcao || "";
+            row.dataset.gramas = String(data.quantidade);
+            measure.hidden = true;
         }
         const nameField = createElement("div", "food-row__name");
         searchPanel.classList.add("food-row__dropdown");
         searchPanel.hidden = true;
         nameField.append(foodName, searchPanel);
-        portions.setAttribute("aria-label", "Porção do catálogo");
         const details = createElement("div", "food-row__details");
-        details.append(portions, nutritionSummary);
-        row.append(nameField, quantity, measure, calories, details);
+        details.append(nutritionSummary);
+        const measureField = createElement("div", "food-row__measure");
+        measureField.append(measure, row.seletorMedida.select);
+        row.append(nameField, quantity, measureField, calories, details, row.seletorMedida.cadastro);
 
         const showDropdown = () => {
             searchPanel.hidden = false;
@@ -746,9 +736,14 @@ function readFoodRow(row) {
                 calorias: Number(row.querySelector('[name="calorias"]').value),
             };
             if (row.dataset.foodId) {
+                const rotulo = row.seletorMedida.rotulo();
+                option.quantidade = Number(row.dataset.gramas) || option.quantidade;
+                option.medida = "g";
                 option.alimento_id = row.dataset.foodId;
                 option.categoria = row.dataset.foodCategory;
-                option.porcao = row.dataset.portion;
+                option.porcao = rotulo ? `${rotulo} · ${row.seletorMedida.peso().toLocaleString("pt-BR")} g` : "gramas";
+                option.quantidade_caseira = rotulo ? Number(row.querySelector('[name="quantidade"]').value) : null;
+                option.medida_caseira = rotulo;
                 option.energia_kcal = row.dataset.energiaKcal
                     ? Number(row.dataset.energiaKcal)
                     : null;
@@ -867,6 +862,102 @@ function carregarGeradorPdf() {
     return html2pdfPromise;
 }
 
+const MACROS_DIETA = [
+    ["proteina_g", "Proteínas", 4],
+    ["carboidrato_g", "Carboidratos", 4],
+    ["gordura_g", "Gorduras", 9],
+];
+
+function calcularNutricaoPlano(plan) {
+    const chaves = ["proteina_g", "carboidrato_g", "gordura_g", "fibra_g", "sodio_mg"];
+    let semDados = 0;
+    const refeicoes = plan.refeicoes.map((meal) => {
+        const linha = { horario: meal.horario, nome: meal.nome, energia_kcal: 0 };
+        chaves.forEach((chave) => { linha[chave] = null; });
+        alimentosDaRefeicao(meal).forEach((food) => {
+            linha.energia_kcal += Number(food.calorias) || 0;
+            if (!food.alimento_id) semDados += 1;
+            chaves.forEach((chave) => {
+                if (food[chave] !== null && food[chave] !== undefined) linha[chave] = (linha[chave] || 0) + Number(food[chave]);
+            });
+        });
+        return linha;
+    });
+    const total = { energia_kcal: refeicoes.reduce((soma, linha) => soma + linha.energia_kcal, 0) };
+    chaves.forEach((chave) => {
+        const valores = refeicoes.map((linha) => linha[chave]).filter((valor) => valor !== null);
+        total[chave] = valores.length ? valores.reduce((soma, valor) => soma + valor, 0) : null;
+    });
+    const energiaMacros = MACROS_DIETA.reduce((soma, [chave, , kcal]) => soma + (total[chave] || 0) * kcal, 0);
+    const distribuicao = MACROS_DIETA.map(([chave, rotulo, kcal]) => ({
+        chave,
+        rotulo,
+        gramas: total[chave],
+        percentual: energiaMacros ? Math.round(((total[chave] || 0) * kcal / energiaMacros) * 100) : null,
+    }));
+    return { refeicoes, total, distribuicao, semDados };
+}
+
+function montarTabelaNutricaoDieta(plan, classe) {
+    const nutricao = calcularNutricaoPlano(plan);
+    const tabela = createElement("table", classe);
+    const cabecalho = createElement("thead");
+    const titulos = createElement("tr");
+    ["Refeição", ...NUTRIENTES_RECEITA.map(([, rotulo, unidade]) => `${rotulo} (${unidade})`)].forEach((texto) => titulos.append(createElement("th", "", texto)));
+    cabecalho.append(titulos);
+    const corpo = createElement("tbody");
+    const adicionarLinha = (rotulo, valores, classeLinha = "") => {
+        const linha = createElement("tr", classeLinha);
+        linha.append(createElement("th", "", rotulo));
+        NUTRIENTES_RECEITA.forEach(([chave, , unidade, casas]) => {
+            const valor = valores[chave];
+            linha.append(createElement("td", "", valor === null || valor === undefined
+                ? "–"
+                : Number(valor).toLocaleString("pt-BR", { maximumFractionDigits: chave === "energia_kcal" ? 0 : casas })));
+        });
+        corpo.append(linha);
+    };
+    nutricao.refeicoes.forEach((linha) => adicionarLinha(`${linha.horario} · ${linha.nome}`, linha));
+    adicionarLinha("Total do dia", nutricao.total, "nutrition-diet__total");
+    tabela.append(cabecalho, corpo);
+    return { tabela, nutricao };
+}
+
+function montarDistribuicaoMacros(nutricao, classe) {
+    const bloco = createElement("div", classe);
+    const barra = createElement("div", `${classe}__bar`);
+    const legenda = createElement("div", `${classe}__legend`);
+    nutricao.distribuicao.forEach((macro) => {
+        const parte = createElement("span", `${classe}__part ${classe}__part--${macro.chave}`);
+        parte.style.width = `${macro.percentual || 0}%`;
+        barra.append(parte);
+        const item = createElement("span", "");
+        item.append(
+            createElement("i", `${classe}__swatch ${classe}__part--${macro.chave}`),
+            createElement("strong", "", macro.percentual === null ? "–" : `${macro.percentual}%`),
+            createElement("span", "", `${macro.rotulo} · ${macro.gramas === null ? "–" : `${Math.round(macro.gramas).toLocaleString("pt-BR")} g`}`),
+        );
+        legenda.append(item);
+    });
+    bloco.append(barra, legenda);
+    return bloco;
+}
+
+function avisoNutricaoDieta(nutricao) {
+    const base = "Valores calculados pela Tabela TACO a partir dos alimentos principais (substituições não entram na soma). A distribuição considera 4 kcal/g de proteínas e carboidratos e 9 kcal/g de gorduras.";
+    return nutricao.semDados
+        ? `${base} ${nutricao.semDados} ${nutricao.semDados === 1 ? "alimento foi digitado" : "alimentos foram digitados"} fora da TACO e ${nutricao.semDados === 1 ? "entra" : "entram"} só com as calorias informadas.`
+        : base;
+}
+
+function textoQuantidadeAlimento(food) {
+    const numero = (valor) => Number(valor).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+    if (food.medida_caseira && food.quantidade_caseira) {
+        return `${numero(food.quantidade_caseira)} ${food.medida_caseira.toLowerCase()} (${numero(food.quantidade)} g)`;
+    }
+    return `${numero(food.quantidade)} ${food.medida}`;
+}
+
 function montarPlanoPdf(plan, nutricionista) {
     const logo = document.querySelector(".brand-logo")?.src
         || new URL("../assets/images/NutriLife-logo-semfundo.png", window.location.href).href;
@@ -874,7 +965,7 @@ function montarPlanoPdf(plan, nutricionista) {
     const refeicoes = plan.refeicoes.map((meal) => ({ ...meal, alimentos: alimentosDaRefeicao(meal) }));
     const kcalDaRefeicao = (meal) => meal.alimentos.reduce((total, food) => total + (Number(food.calorias) || 0), 0);
     const kcalDia = refeicoes.reduce((total, meal) => total + kcalDaRefeicao(meal), 0);
-    const quantidade = (food) => `${Number(food.quantidade).toLocaleString("pt-BR")} ${food.medida}`;
+    const quantidade = textoQuantidadeAlimento;
 
     const pagina = createElement("div", "pdf-plano");
 
@@ -946,13 +1037,19 @@ function montarPlanoPdf(plan, nutricionista) {
         listaRefeicoes.append(bloco);
     });
 
-    const rodape = createElement(
-        "footer",
-        "pdf-footer",
-        `Plano elaborado por ${plan.nutricionista_nome}${crn ? ` (${crn})` : ""} · NutriLife — cuidado nutricional de forma simples, organizada e próxima.`,
+    const resumoNutricional = createElement("section", "pdf-nutricao");
+    const { tabela: tabelaNutricao, nutricao } = montarTabelaNutricaoDieta(plan, "pdf-tabela pdf-tabela--nutricao");
+    resumoNutricional.append(
+        createElement("h2", "", "Tabela nutricional da dieta"),
+        ...(comparacaoGastoDieta(plan, nutricao.total.energia_kcal) ? [createElement("p", "pdf-nutricao__gasto", comparacaoGastoDieta(plan, nutricao.total.energia_kcal).texto)] : []),
+        montarDistribuicaoMacros(nutricao, "pdf-macros"),
+        tabelaNutricao,
+        createElement("p", "pdf-nutricao__nota", avisoNutricaoDieta(nutricao)),
     );
 
-    pagina.append(cabecalho, cards, orientacoes, listaRefeicoes, rodape);
+    pagina.append(cabecalho, cards, orientacoes, resumoNutricional, listaRefeicoes);
+    const receitasPlano = receitasDoPlano(plan.id);
+    if (receitasPlano.length) pagina.append(montarReceitasPdf(receitasPlano));
     return pagina;
 }
 
@@ -962,6 +1059,8 @@ async function baixarPlanoPdf(plan) {
         api.obterNutricionista(plan.nutricionista_id).catch(() => null),
     ]);
     const pagina = montarPlanoPdf(plan, nutricionista);
+    const crn = nutricionista?.crn ? formatarCrn(nutricionista.crn) : "";
+    const textoFinal = `Plano elaborado por ${plan.nutricionista_nome}${crn ? ` (${crn})` : ""} · NutriLife — cuidado nutricional de forma simples, organizada e próxima.`;
     const area = createElement("div", "pdf-area");
     area.append(pagina);
     document.body.append(area);
@@ -972,22 +1071,29 @@ async function baixarPlanoPdf(plan) {
             .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
         await html2pdf()
             .set({
-                margin: [10, 10, 14, 10],
+                margin: [10, 0, 14, 0],
                 filename: `plano-alimentar-${nomeArquivo}.pdf`,
                 image: { type: "jpeg", quality: 0.96 },
                 html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
                 jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-                pagebreak: { mode: ["css", "legacy"], avoid: [".pdf-refeicao", ".pdf-cards", ".pdf-header"] },
+                pagebreak: { mode: ["css", "legacy"], avoid: [".pdf-refeicao", ".pdf-receita", ".pdf-receitas__inicio", ".pdf-cards", ".pdf-header", ".pdf-orientacoes", ".pdf-nutricao"] },
             })
             .from(pagina)
             .toPdf()
             .get("pdf")
             .then((pdf) => {
                 const total = pdf.internal.getNumberOfPages();
+                pdf.setPage(1);
+                pdf.setFillColor(236, 241, 236);
+                pdf.rect(0, 0, pdf.internal.pageSize.getWidth(), 10.2, "F");
                 for (let numero = 1; numero <= total; numero += 1) {
                     pdf.setPage(numero);
-                    pdf.setFontSize(8);
                     pdf.setTextColor(51, 102, 51);
+                    if (numero === total) {
+                        pdf.setFontSize(7.5);
+                        pdf.text(textoFinal, pdf.internal.pageSize.getWidth() / 2, pdf.internal.pageSize.getHeight() - 10, { align: "center" });
+                    }
+                    pdf.setFontSize(8);
                     pdf.text(
                         `NutriLife · Página ${numero} de ${total}`,
                         pdf.internal.pageSize.getWidth() / 2,
@@ -1000,6 +1106,954 @@ async function baixarPlanoPdf(plan) {
     } finally {
         area.remove();
     }
+}
+
+let receitasCarregadas = [];
+
+const NUTRIENTES_RECEITA = [
+    ["energia_kcal", "Energia", "kcal", 0],
+    ["proteina_g", "Proteínas", "g", 1],
+    ["carboidrato_g", "Carboidratos", "g", 1],
+    ["gordura_g", "Gorduras", "g", 1],
+    ["fibra_g", "Fibras", "g", 1],
+    ["sodio_mg", "Sódio", "mg", 0],
+];
+
+function receitasDoPlano(planoId) {
+    return receitasCarregadas.filter((receita) => receita.planos.some((plano) => plano.id === planoId));
+}
+
+function valorNutriente(valor, unidade, casas) {
+    return valor === null || valor === undefined
+        ? "–"
+        : `${Number(valor).toLocaleString("pt-BR", { maximumFractionDigits: casas })} ${unidade}`;
+}
+
+function textoPorcoes(porcoes) {
+    return `${porcoes} ${porcoes === 1 ? "porção" : "porções"}`;
+}
+
+function resumoReceita(receita) {
+    const kcal = receita.nutricao_porcao?.energia_kcal;
+    return [
+        receita.categoria,
+        `${receita.tempo_preparo_min} min`,
+        textoPorcoes(receita.porcoes),
+        kcal != null ? `${Math.round(kcal).toLocaleString("pt-BR")} kcal por porção` : "",
+    ].filter(Boolean).join(" · ");
+}
+
+function textoIngrediente(ingrediente) {
+    const quantidadeCaseira = ingrediente.medida
+        ? `${ingrediente.quantidade ? `${Number(ingrediente.quantidade).toLocaleString("pt-BR")} ` : ""}${ingrediente.medida.toLowerCase()}`
+        : "";
+    const detalhes = [
+        quantidadeCaseira,
+        ingrediente.gramas ? valorNutriente(ingrediente.gramas, "g", 1) : "",
+    ].filter(Boolean).join(" · ");
+    return detalhes ? `${ingrediente.nome} — ${detalhes}` : ingrediente.nome;
+}
+
+function avisoNutricao(receita) {
+    if (!receita.ingredientes_calculados) return "Nenhum ingrediente vinculado à TACO: valores nutricionais indisponíveis.";
+    if (receita.ingredientes_calculados < receita.ingredientes.length) {
+        return `Calculado com ${receita.ingredientes_calculados} de ${receita.ingredientes.length} ingredientes (os demais não estão vinculados à TACO).`;
+    }
+    return "Valores calculados com base na Tabela TACO.";
+}
+
+function montarTabelaNutricao(receita, classe) {
+    const tabela = createElement("table", classe);
+    const cabecalho = createElement("thead");
+    const linhaTitulo = createElement("tr");
+    ["Nutriente", "Por porção", "Receita inteira"].forEach((texto) => linhaTitulo.append(createElement("th", "", texto)));
+    cabecalho.append(linhaTitulo);
+    const corpo = createElement("tbody");
+    NUTRIENTES_RECEITA.forEach(([chave, rotulo, unidade, casas]) => {
+        const linha = createElement("tr");
+        linha.append(
+            createElement("th", "", rotulo),
+            createElement("td", "", valorNutriente(receita.nutricao_porcao?.[chave], unidade, casas)),
+            createElement("td", "", valorNutriente(receita.nutricao_total?.[chave], unidade, casas)),
+        );
+        corpo.append(linha);
+    });
+    tabela.append(cabecalho, corpo);
+    return tabela;
+}
+
+function montarConteudoReceita(receita) {
+    const conteudo = createElement("div", "recipe-body");
+    const ingredientes = createElement("ul", "recipe-body__ingredients");
+    receita.ingredientes.forEach((item) => {
+        const quantidadeCaseira = item.medida
+            ? `${item.quantidade ? `${Number(item.quantidade).toLocaleString("pt-BR")} ` : ""}${item.medida.toLowerCase()}`
+            : "";
+        const detalhe = [quantidadeCaseira, item.gramas ? valorNutriente(item.gramas, "g", 1) : ""].filter(Boolean).join(" · ");
+        const linha = createElement("li", "recipe-body__ingredient");
+        linha.append(createElement("span", "", item.nome));
+        if (detalhe) linha.append(createElement("span", "recipe-body__amount", detalhe));
+        ingredientes.append(linha);
+    });
+    conteudo.append(
+        createElement("h5", "", "Ingredientes"),
+        ingredientes,
+        createElement("h5", "", "Modo de preparo"),
+        createElement("p", "recipe-body__steps", receita.modo_preparo),
+        createElement("h5", "", "Informação nutricional"),
+        montarTabelaNutricao(receita, "recipe-nutrition-table"),
+        createElement("p", "item-meta", avisoNutricao(receita)),
+    );
+    return conteudo;
+}
+
+function montarReceitaRecolhivel(receita) {
+    const detalhes = createElement("details", "recipe-item");
+    const resumo = createElement("summary", "recipe-item__summary");
+    resumo.append(
+        createElement("strong", "", receita.titulo),
+        createElement("span", "item-meta", resumoReceita(receita)),
+    );
+    detalhes.append(resumo, montarConteudoReceita(receita));
+    return detalhes;
+}
+
+function montarReceitasPdf(receitas) {
+    const secao = createElement("section", "pdf-receitas");
+    const titulo = createElement("h2", "", "Receitas da dieta");
+    receitas.forEach((receita, indice) => {
+        const bloco = createElement("article", "pdf-receita");
+        const topo = createElement("div", "pdf-receita__head");
+        topo.append(createElement("h3", "", receita.titulo), createElement("span", "pdf-receita__meta", resumoReceita(receita)));
+        const colunas = createElement("div", "pdf-receita__cols");
+        const ingredientes = createElement("div", "pdf-receita__col");
+        const lista = createElement("ul", "");
+        receita.ingredientes.forEach((item) => lista.append(createElement("li", "", textoIngrediente(item))));
+        ingredientes.append(createElement("h4", "", "Ingredientes"), lista);
+        const preparo = createElement("div", "pdf-receita__col");
+        preparo.append(createElement("h4", "", "Modo de preparo"), createElement("p", "pdf-receita__passos", receita.modo_preparo));
+        colunas.append(ingredientes, preparo);
+        const nutricao = createElement("div", "pdf-receita__nutricao");
+        NUTRIENTES_RECEITA.forEach(([chave, rotulo, unidade, casas]) => {
+            const item = createElement("div", "pdf-receita__nutriente");
+            item.append(createElement("span", "", rotulo), createElement("strong", "", valorNutriente(receita.nutricao_porcao?.[chave], unidade, casas)));
+            nutricao.append(item);
+        });
+        bloco.append(topo, colunas, nutricao, createElement("p", "pdf-receita__aviso", `Valores por porção. ${avisoNutricao(receita)}`));
+        if (indice === 0) {
+            const inicio = createElement("div", "pdf-receitas__inicio");
+            inicio.append(titulo, bloco);
+            secao.append(inicio);
+        } else {
+            secao.append(bloco);
+        }
+    });
+    return secao;
+}
+
+const cacheMedidasProprias = new Map();
+
+function medidasPropriasDoAlimento(alimentoId) {
+    if (!cacheMedidasProprias.has(alimentoId)) {
+        cacheMedidasProprias.set(alimentoId, api.listarMedidasAlimento(alimentoId).catch(() => []));
+    }
+    return cacheMedidasProprias.get(alimentoId);
+}
+
+function criarSeletorMedida(quantidade, aoMudar) {
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", "Medida");
+    const cadastro = createElement("div", "medida-cadastro");
+    cadastro.hidden = true;
+    const nomeMedida = document.createElement("input");
+    nomeMedida.maxLength = 60;
+    nomeMedida.placeholder = "Ex.: Colher de sopa cheia";
+    const pesoMedida = document.createElement("input");
+    pesoMedida.type = "number";
+    pesoMedida.min = "0.1";
+    pesoMedida.max = "5000";
+    pesoMedida.step = "any";
+    pesoMedida.placeholder = "Gramas";
+    const salvar = createElement("button", "btn btn--primary", "Salvar medida");
+    salvar.type = "button";
+    const cancelar = createElement("button", "btn btn--ghost", "Cancelar");
+    cancelar.type = "button";
+    const dica = createElement("p", "medida-cadastro__dica item-meta");
+    cadastro.append(
+        inputGroup("Nome da medida (uma unidade)", nomeMedida),
+        inputGroup("Quanto pesa 1 medida (g)", pesoMedida),
+        salvar,
+        cancelar,
+        dica,
+    );
+    let alimento = null;
+    let proprias = [];
+    let anterior = "1";
+
+    const medidasIbge = () => (alimento?.portions || []).filter((porcao) => !porcao.label.startsWith("100 g"));
+    const separarQuantidade = (texto) => {
+        const encontrado = texto.trim().match(/^(\d+(?:[.,]\d+)?)\s*(?:x\s*)?(.+)$/i);
+        return encontrado
+            ? { quantidade: Number(encontrado[1].replace(",", ".")), rotulo: encontrado[2].trim() }
+            : { quantidade: null, rotulo: texto.trim() };
+    };
+    const sugerirPeso = () => {
+        const normalizado = separarQuantidade(nomeMedida.value).rotulo.toLowerCase();
+        const parecida = medidasIbge()
+            .map((porcao) => ({ nome: porcao.label.split(" · ")[0], gramas: porcao.gram_weight }))
+            .filter((porcao) => normalizado.includes(porcao.nome.toLowerCase()))
+            .sort((a, b) => b.nome.length - a.nome.length)[0];
+        pesoMedida.placeholder = parecida ? `Ex.: ${parecida.gramas.toLocaleString("pt-BR")}` : "Gramas";
+        dica.textContent = parecida
+            ? `Referência do IBGE para este alimento: ${parecida.nome.toLowerCase()} = ${parecida.gramas.toLocaleString("pt-BR")} g. Ajuste se a sua medida for diferente (cheia, rasa...).`
+            : medidasIbge().length
+                ? "Informe o peso de uma unidade da medida. A quantidade (ex.: 2) vai no campo Quantidade."
+                : "O IBGE não tem medidas caseiras para este alimento. Use a porção do rótulo da embalagem (ex.: 20 g = 2 colheres de sopa → 10 g cada) ou pese uma vez numa balança. A quantidade (ex.: 2) vai no campo Quantidade.";
+    };
+    const rotulo = () => select.selectedOptions[0]?.dataset.rotulo || null;
+    const montar = (selecionar) => {
+        select.replaceChildren();
+        const gramas = new Option("gramas (g)", "1");
+        gramas.dataset.rotulo = "";
+        select.add(gramas);
+        const adicionarGrupo = (titulo, itens) => {
+            if (!itens.length) return;
+            const grupo = document.createElement("optgroup");
+            grupo.label = titulo;
+            itens.forEach(([texto, peso, nomeCurto]) => {
+                const opcao = new Option(texto, String(peso));
+                opcao.dataset.rotulo = nomeCurto;
+                grupo.append(opcao);
+            });
+            select.add(grupo);
+        };
+        adicionarGrupo("Medidas caseiras (IBGE)", medidasIbge().map((porcao) => [porcao.label, porcao.gram_weight, porcao.label.split(" · ")[0]]));
+        adicionarGrupo("Suas medidas", proprias.map((medida) => [`${medida.rotulo} · ${medida.gramas.toLocaleString("pt-BR")} g`, medida.gramas, medida.rotulo]));
+        const novaOpcao = new Option("+ Cadastrar medida…", "nova");
+        novaOpcao.dataset.rotulo = "";
+        select.add(novaOpcao);
+        const alvo = [...select.options].find((opcao) => selecionar && opcao.dataset.rotulo === selecionar);
+        if (alvo) alvo.selected = true;
+        else select.value = "1";
+        anterior = select.value;
+    };
+    const vincular = (novo, selecionar = null, aoResolver = null) => {
+        alimento = novo;
+        proprias = [];
+        cadastro.hidden = true;
+        if (!novo) return;
+        montar(selecionar);
+        const achouNaHora = Boolean(selecionar) && rotulo() === selecionar;
+        if (aoResolver && (achouNaHora || !selecionar)) aoResolver(achouNaHora);
+        medidasPropriasDoAlimento(novo.id).then((lista) => {
+            if (alimento !== novo) return;
+            const atual = rotulo();
+            proprias = lista;
+            const pendente = Boolean(selecionar) && !achouNaHora && !atual;
+            montar(pendente ? selecionar : atual);
+            if (aoResolver && pendente) aoResolver(rotulo() === selecionar);
+            aoMudar();
+        });
+    };
+
+    select.addEventListener("change", () => {
+        if (select.value === "nova") {
+            select.value = anterior;
+            cadastro.hidden = false;
+            sugerirPeso();
+            nomeMedida.focus();
+            return;
+        }
+        if (anterior === "1" && select.value !== "1" && Number(quantidade.value) >= 10) quantidade.value = "1";
+        anterior = select.value;
+        aoMudar();
+    });
+    nomeMedida.addEventListener("input", sugerirPeso);
+    cancelar.addEventListener("click", () => {
+        cadastro.hidden = true;
+        nomeMedida.value = "";
+        pesoMedida.value = "";
+    });
+    salvar.addEventListener("click", async () => {
+        const { quantidade: quantidadeDigitada, rotulo: novoRotulo } = separarQuantidade(nomeMedida.value);
+        const gramas = Number(pesoMedida.value);
+        if (novoRotulo.length < 2) {
+            showDashboardError("Informe o nome da medida, por exemplo: Colher de sopa cheia.");
+            nomeMedida.focus();
+            return;
+        }
+        if (!(gramas > 0)) {
+            showDashboardError(`Informe quanto pesa 1 ${novoRotulo.toLowerCase()}, em gramas.`);
+            pesoMedida.focus();
+            return;
+        }
+        salvar.disabled = true;
+        try {
+            const salva = await api.criarMedidaAlimento(alimento.id, { rotulo: novoRotulo, gramas });
+            proprias = [...proprias.filter((medida) => medida.rotulo !== salva.rotulo), salva].sort((a, b) => a.gramas - b.gramas);
+            cacheMedidasProprias.set(alimento.id, Promise.resolve(proprias));
+            montar(salva.rotulo);
+            if (quantidadeDigitada) quantidade.value = String(quantidadeDigitada);
+            else if (!quantidade.value || Number(quantidade.value) >= 10) quantidade.value = "1";
+            cadastro.hidden = true;
+            nomeMedida.value = "";
+            pesoMedida.value = "";
+            showDashboardSuccess(`Medida "${salva.rotulo}" salva para ${alimento.name}.`);
+            aoMudar();
+        } catch (error) {
+            showDashboardError(error.message);
+        } finally {
+            salvar.disabled = false;
+        }
+    });
+
+    return {
+        select,
+        cadastro,
+        vincular,
+        rotulo,
+        peso: () => Number(select.value) || 0,
+        gramas: () => {
+            const total = Number(quantidade.value) * (Number(select.value) || 0);
+            return total > 0 ? Math.round(total * 10) / 10 : null;
+        },
+    };
+}
+
+function criarLinhaIngrediente(aoMudar, inicial = {}) {
+    const linha = createElement("div", "recipe-ingredient");
+    linha.alimento = null;
+    const nome = document.createElement("input");
+    nome.type = "search";
+    nome.autocomplete = "off";
+    nome.maxLength = 200;
+    nome.required = true;
+    nome.placeholder = "Buscar na TACO ou digitar";
+    nome.value = inicial.nome || "";
+    const quantidade = document.createElement("input");
+    quantidade.type = "number";
+    quantidade.min = "0.01";
+    quantidade.max = "10000";
+    quantidade.step = "any";
+    quantidade.placeholder = "Qtd.";
+    const medidaLivre = document.createElement("input");
+    medidaLivre.maxLength = 80;
+    medidaLivre.placeholder = "Ex.: a gosto";
+    medidaLivre.setAttribute("aria-label", "Medida");
+    const remover = createElement("button", "btn btn--ghost recipe-ingredient__remove", "Remover");
+    remover.type = "button";
+    const resultados = createElement("div", "recipe-ingredient__results");
+    resultados.hidden = true;
+    const info = createElement("p", "recipe-ingredient__info item-meta");
+    const seletor = criarSeletorMedida(quantidade, () => atualizarInfo());
+    const medidaTaco = seletor.select;
+    const gramasCalculados = () => (linha.alimento ? seletor.gramas() : null);
+
+    const atualizarModo = () => {
+        const taco = Boolean(linha.alimento);
+        medidaTaco.parentElement.hidden = !taco;
+        medidaLivre.parentElement.hidden = taco;
+        quantidade.required = taco;
+    };
+
+    const atualizarInfo = () => {
+        atualizarModo();
+        if (!linha.alimento) {
+            info.textContent = nome.value.trim() ? "Texto livre: não entra no cálculo nutricional." : "";
+        } else {
+            const energia = linha.alimento.nutrients_per_100g.energia_kcal;
+            const gramas = gramasCalculados();
+            info.textContent = gramas && energia != null
+                ? `TACO · ${gramas.toLocaleString("pt-BR")} g · ${Math.round(energia * gramas / 100).toLocaleString("pt-BR")} kcal`
+                : "TACO · informe a quantidade.";
+        }
+        aoMudar();
+    };
+
+    const vincular = (alimento, selecionar = null) => {
+        linha.alimento = alimento;
+        seletor.vincular(alimento, selecionar);
+        if (alimento) {
+            nome.value = alimento.name;
+            if (!quantidade.value) quantidade.value = medidaTaco.value === "1" ? "100" : "1";
+        }
+        atualizarInfo();
+    };
+
+    let espera;
+    let versao = 0;
+    nome.addEventListener("input", () => {
+        if (linha.alimento && nome.value !== linha.alimento.name) vincular(null);
+        else atualizarInfo();
+        clearTimeout(espera);
+        const termo = nome.value.trim();
+        if (termo.length < 2 || linha.alimento) {
+            resultados.hidden = true;
+            return;
+        }
+        espera = setTimeout(async () => {
+            const minhaVersao = ++versao;
+            try {
+                const resposta = await api.buscarAlimentos(termo, "", 0);
+                if (minhaVersao !== versao || !linha.isConnected) return;
+                resultados.replaceChildren();
+                resposta.items.slice(0, 8).forEach((alimento) => {
+                    const opcao = createElement("button", "recipe-ingredient__option");
+                    opcao.type = "button";
+                    opcao.append(createElement("strong", "", alimento.name), createElement("small", "", alimento.category));
+                    opcao.addEventListener("mousedown", (event) => event.preventDefault());
+                    opcao.addEventListener("click", () => {
+                        quantidade.value = "";
+                        vincular(alimento);
+                        resultados.hidden = true;
+                        quantidade.focus();
+                    });
+                    resultados.append(opcao);
+                });
+                if (!resposta.items.length) resultados.append(createElement("p", "item-meta", "Nenhum alimento da TACO encontrado. Você pode manter como texto livre."));
+                resultados.hidden = false;
+            } catch {
+                resultados.hidden = true;
+            }
+        }, 300);
+    });
+    nome.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") resultados.hidden = true;
+    });
+    nome.addEventListener("blur", () => { resultados.hidden = true; });
+    quantidade.addEventListener("input", atualizarInfo);
+    remover.addEventListener("click", () => {
+        linha.remove();
+        aoMudar();
+    });
+
+    const campoNome = inputGroup("Ingrediente", nome);
+    campoNome.classList.add("recipe-ingredient__name");
+    campoNome.append(resultados);
+    linha.append(
+        campoNome,
+        inputGroup("Quantidade", quantidade),
+        inputGroup("Medida", medidaTaco),
+        inputGroup("Medida", medidaLivre),
+        remover,
+        info,
+        seletor.cadastro,
+    );
+    linha.ler = () => (linha.alimento
+        ? {
+            nome: nome.value.trim(),
+            alimento_id: linha.alimento.id,
+            quantidade: seletor.rotulo() ? Number(quantidade.value) || null : null,
+            medida: seletor.rotulo(),
+            gramas: gramasCalculados(),
+        }
+        : {
+            nome: nome.value.trim(),
+            alimento_id: null,
+            quantidade: Number(quantidade.value) || null,
+            medida: medidaLivre.value.trim() || null,
+            gramas: null,
+        });
+    linha.nutrientes = () => {
+        const gramas = gramasCalculados();
+        return linha.alimento && gramas ? { por100: linha.alimento.nutrients_per_100g, gramas } : null;
+    };
+
+    if (inicial.alimento_id) {
+        info.textContent = "Carregando dados da TACO...";
+        api.obterAlimento(inicial.alimento_id)
+            .then((alimento) => {
+                const usaMedida = Boolean(inicial.medida && inicial.quantidade);
+                linha.alimento = alimento;
+                nome.value = inicial.nome;
+                seletor.vincular(alimento, usaMedida ? inicial.medida : null, (achou) => {
+                    quantidade.value = String(achou ? inicial.quantidade : inicial.gramas ?? "");
+                    atualizarInfo();
+                });
+            })
+            .catch(() => atualizarInfo());
+    } else {
+        quantidade.value = inicial.quantidade ?? "";
+        medidaLivre.value = inicial.medida || "";
+        atualizarInfo();
+    }
+    return linha;
+}
+
+function lerFormularioReceita(form) {
+    const dados = new FormData(form);
+    return {
+        titulo: dados.get("titulo").trim(),
+        categoria: dados.get("categoria"),
+        tempo_preparo_min: Number(dados.get("tempo_preparo_min")),
+        porcoes: Number(dados.get("porcoes")),
+        ingredientes: [...form.querySelectorAll(".recipe-ingredient")].map((linha) => linha.ler()).filter((item) => item.nome),
+        modo_preparo: dados.get("modo_preparo").trim(),
+        planos_ids: dados.getAll("planos_ids"),
+    };
+}
+
+function atualizarPreviaNutricao(form) {
+    const previa = document.getElementById("recipe-nutrition-preview");
+    const linhas = [...form.querySelectorAll(".recipe-ingredient")];
+    const calculaveis = linhas.map((linha) => linha.nutrientes()).filter(Boolean);
+    previa.replaceChildren();
+    if (!calculaveis.length) {
+        previa.append(createElement("p", "item-meta", "Vincule ingredientes à TACO para ver o cálculo nutricional."));
+        return;
+    }
+    const porcoes = Math.max(1, Number(form.elements.porcoes.value) || 1);
+    const total = {};
+    NUTRIENTES_RECEITA.forEach(([chave]) => {
+        const valores = calculaveis.map(({ por100, gramas }) => (por100[chave] == null ? null : por100[chave] * gramas / 100)).filter((valor) => valor !== null);
+        total[chave] = valores.length ? valores.reduce((soma, valor) => soma + valor, 0) : null;
+    });
+    const titulo = createElement("strong", "", `Prévia por porção (${textoPorcoes(porcoes)})`);
+    const grade = createElement("div", "recipe-nutrition-preview__grid");
+    NUTRIENTES_RECEITA.forEach(([chave, rotulo, unidade, casas]) => {
+        const item = createElement("div", "");
+        item.append(createElement("span", "", rotulo), createElement("strong", "", valorNutriente(total[chave] == null ? null : total[chave] / porcoes, unidade, casas)));
+        grade.append(item);
+    });
+    previa.append(titulo, grade, createElement("p", "item-meta", `${calculaveis.length} de ${linhas.length} ingredientes com dados da TACO.`));
+}
+
+async function loadRecipesPage(user) {
+    const nutricionista = user.perfil === "nutricionista";
+    if (!nutricionista && user.perfil !== "paciente") {
+        window.location.replace("../dashboard.html");
+        return;
+    }
+    const lista = document.getElementById("recipes-list");
+    const busca = document.getElementById("recipe-search");
+    const painelFormulario = document.getElementById("recipe-form-panel");
+    const form = document.getElementById("recipe-form");
+    const novaReceita = document.getElementById("new-recipe");
+    const listaIngredientes = document.getElementById("recipe-ingredients");
+    let editandoId = null;
+    let planos = [];
+
+    document.getElementById("recipes-subtitle").textContent = nutricionista
+        ? "Cadastre receitas com ingredientes da TACO e vincule às dietas dos seus pacientes."
+        : "Receitas que o seu nutricionista vinculou ao seu plano alimentar.";
+
+    const atualizarPrevia = () => atualizarPreviaNutricao(form);
+    const adicionarIngrediente = (dados) => listaIngredientes.append(criarLinhaIngrediente(atualizarPrevia, dados));
+
+    const montarPlanosFormulario = (selecionados = []) => {
+        const container = document.getElementById("recipe-plans");
+        container.replaceChildren();
+        if (!planos.length) {
+            container.append(createElement("p", "item-meta", "Você ainda não tem planos alimentares para vincular."));
+            return;
+        }
+        planos.forEach((plano) => {
+            const rotulo = createElement("label", "recipe-plans__option");
+            const caixa = document.createElement("input");
+            caixa.type = "checkbox";
+            caixa.name = "planos_ids";
+            caixa.value = plano.id;
+            caixa.checked = selecionados.includes(plano.id);
+            const texto = createElement("span", "");
+            texto.append(createElement("strong", "", plano.paciente_nome), createElement("small", "", plano.titulo));
+            rotulo.append(caixa, texto);
+            container.append(rotulo);
+        });
+    };
+
+    const abrirFormulario = (receita = null) => {
+        editandoId = receita?.id || null;
+        form.reset();
+        document.getElementById("recipe-form-title").textContent = receita ? "Editar receita" : "Nova receita";
+        listaIngredientes.replaceChildren();
+        if (receita) {
+            form.elements.titulo.value = receita.titulo;
+            form.elements.categoria.value = receita.categoria;
+            form.elements.tempo_preparo_min.value = receita.tempo_preparo_min;
+            form.elements.porcoes.value = receita.porcoes;
+            form.elements.modo_preparo.value = receita.modo_preparo;
+            receita.ingredientes.forEach((ingrediente) => adicionarIngrediente(ingrediente));
+        } else {
+            adicionarIngrediente();
+        }
+        montarPlanosFormulario(receita ? receita.planos.map((plano) => plano.id) : []);
+        atualizarPrevia();
+        painelFormulario.hidden = false;
+        novaReceita.hidden = true;
+        painelFormulario.scrollIntoView({ behavior: "smooth", block: "start" });
+        form.elements.titulo.focus({ preventScroll: true });
+    };
+
+    const fecharFormulario = () => {
+        painelFormulario.hidden = true;
+        novaReceita.hidden = false;
+        editandoId = null;
+    };
+
+    const renderizar = () => {
+        const termo = busca.value.trim().toLowerCase();
+        const visiveis = receitasCarregadas.filter((receita) => receita.titulo.toLowerCase().includes(termo)
+            || receita.categoria.toLowerCase().includes(termo));
+        lista.replaceChildren();
+        if (!receitasCarregadas.length) {
+            lista.append(createElement("p", "item-meta", nutricionista
+                ? "Nenhuma receita cadastrada ainda. Clique em \"Nova receita\" para começar."
+                : "Ainda não há receitas vinculadas ao seu plano alimentar."));
+            return;
+        }
+        if (!visiveis.length) {
+            lista.append(createElement("p", "item-meta", "Nenhuma receita encontrada para essa busca."));
+            return;
+        }
+        visiveis.forEach((receita) => {
+            const card = createElement("article", "recipe-card");
+            if (receita.categoria) card.append(createElement("span", "recipe-card__category", receita.categoria));
+            card.append(createElement("h4", "", receita.titulo));
+            const meta = createElement("p", "recipe-card__meta");
+            meta.append(
+                createElement("span", "", `${receita.tempo_preparo_min} min`),
+                createElement("span", "", textoPorcoes(receita.porcoes)),
+            );
+            card.append(meta);
+            const kcal = receita.nutricao_porcao?.energia_kcal;
+            if (kcal != null) {
+                const destaques = createElement("div", "recipe-card__macros");
+                [
+                    ["kcal", Math.round(kcal).toLocaleString("pt-BR")],
+                    ["prot.", valorNutriente(receita.nutricao_porcao.proteina_g, "g", 1)],
+                    ["carb.", valorNutriente(receita.nutricao_porcao.carboidrato_g, "g", 1)],
+                    ["gord.", valorNutriente(receita.nutricao_porcao.gordura_g, "g", 1)],
+                ].forEach(([rotulo, valor]) => {
+                    const item = createElement("span", "");
+                    item.append(createElement("strong", "", valor), createElement("small", "", rotulo));
+                    destaques.append(item);
+                });
+                card.append(destaques, createElement("p", "recipe-card__note", "Por porção · TACO"));
+            }
+            card.append(createElement("p", "recipe-card__plans", nutricionista
+                ? (receita.planos.length
+                    ? `Vinculada a: ${receita.planos.map((plano) => plano.paciente_nome).join(", ")}`
+                    : "Ainda não vinculada a nenhum plano.")
+                : `Indicada por ${receita.nutricionista_nome}`));
+            const detalhes = createElement("details", "recipe-card__details");
+            detalhes.append(createElement("summary", "", "Ver ingredientes, preparo e nutrição"), montarConteudoReceita(receita));
+            card.append(detalhes);
+            if (nutricionista) {
+                const acoes = createElement("div", "recipe-card__actions");
+                const editar = createElement("button", "btn btn--ghost", "Editar");
+                editar.type = "button";
+                editar.addEventListener("click", () => abrirFormulario(receita));
+                const excluir = createElement("button", "btn btn--ghost recipe-card__delete", "Excluir");
+                excluir.type = "button";
+                excluir.addEventListener("click", async () => {
+                    if (!window.confirm(`Excluir a receita "${receita.titulo}"?`)) return;
+                    try {
+                        await api.excluirReceita(receita.id);
+                        receitasCarregadas = receitasCarregadas.filter((item) => item.id !== receita.id);
+                        if (editandoId === receita.id) fecharFormulario();
+                        renderizar();
+                        showDashboardSuccess("Receita excluída.");
+                    } catch (error) {
+                        showDashboardError(error.message);
+                    }
+                });
+                acoes.append(editar, excluir);
+                card.append(acoes);
+            }
+            lista.append(card);
+        });
+    };
+
+    busca.addEventListener("input", renderizar);
+
+    if (nutricionista) {
+        novaReceita.hidden = false;
+        novaReceita.addEventListener("click", () => abrirFormulario());
+        document.getElementById("recipe-cancel").addEventListener("click", fecharFormulario);
+        document.getElementById("recipe-add-ingredient").addEventListener("click", () => {
+            adicionarIngrediente();
+            listaIngredientes.lastElementChild.querySelector("input").focus();
+        });
+        form.elements.porcoes.addEventListener("input", atualizarPrevia);
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const botao = form.querySelector('button[type="submit"]');
+            const receita = lerFormularioReceita(form);
+            if (!receita.ingredientes.length) {
+                showDashboardError("Informe pelo menos um ingrediente.");
+                return;
+            }
+            const editando = Boolean(editandoId);
+            botao.disabled = true;
+            try {
+                const salva = editando
+                    ? await api.atualizarReceita(editandoId, receita)
+                    : await api.criarReceita(receita);
+                receitasCarregadas = [salva, ...receitasCarregadas.filter((item) => item.id !== salva.id)]
+                    .sort((a, b) => a.titulo.localeCompare(b.titulo, "pt-BR"));
+                showDashboardSuccess(editando ? "Receita atualizada." : "Receita cadastrada.");
+                fecharFormulario();
+                renderizar();
+            } catch (error) {
+                showDashboardError(error.message);
+            } finally {
+                botao.disabled = false;
+            }
+        });
+        [planos, receitasCarregadas] = await Promise.all([api.listarPlanos(), api.listarReceitas()]);
+    } else {
+        receitasCarregadas = await api.listarReceitas();
+    }
+    renderizar();
+}
+
+const AVISO_FECHADO_KEY = "nutrilife_aviso_mensagem_fechado";
+
+function caminhoMensagens(contatoId) {
+    const base = window.location.pathname.includes("/pages/") ? "./mensagens.html" : "./pages/mensagens.html";
+    return contatoId ? `${base}?contato=${encodeURIComponent(contatoId)}` : base;
+}
+
+function horarioMensagem(valor) {
+    const data = new Date(valor);
+    const hoje = new Date();
+    const mesmoDia = data.toDateString() === hoje.toDateString();
+    return new Intl.DateTimeFormat("pt-BR", mesmoDia
+        ? { hour: "2-digit", minute: "2-digit" }
+        : { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(data);
+}
+
+function atualizarContadorMenu(total) {
+    const link = document.getElementById("messages-nav");
+    if (!link) return;
+    let contador = link.querySelector(".nav-badge");
+    if (!total) {
+        contador?.remove();
+        return;
+    }
+    if (!contador) {
+        contador = createElement("span", "nav-badge");
+        link.append(contador);
+    }
+    contador.textContent = total > 99 ? "99+" : String(total);
+    contador.setAttribute("aria-label", `${total} ${total === 1 ? "mensagem nova" : "mensagens novas"}`);
+}
+
+function iniciarAvisoMensagens(perfil) {
+    if (!["nutricionista", "paciente"].includes(perfil)) return;
+    const naPaginaDeMensagens = document.body.dataset.page === "messages";
+    const aviso = createElement("aside", "chat-alert");
+    aviso.hidden = true;
+    aviso.setAttribute("aria-live", "polite");
+    const abrir = createElement("a", "chat-alert__open");
+    const icone = createElement("span", "chat-alert__icon");
+    icone.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2Zm3 6v2h2v-2H7Zm4 0v2h2v-2h-2Zm4 0v2h2v-2h-2Z"/></svg>';
+    const contador = createElement("span", "chat-alert__count");
+    icone.append(contador);
+    const texto = createElement("span", "chat-alert__text");
+    const titulo = createElement("strong", "");
+    const previa = createElement("span", "");
+    texto.append(titulo, previa);
+    abrir.append(icone, texto);
+    const fechar = createElement("button", "chat-alert__close", "×");
+    fechar.type = "button";
+    fechar.setAttribute("aria-label", "Fechar aviso de mensagem");
+    aviso.append(abrir, fechar);
+    document.body.append(aviso);
+    let ultimaVista = null;
+
+    fechar.addEventListener("click", () => {
+        aviso.hidden = true;
+        try {
+            sessionStorage.setItem(AVISO_FECHADO_KEY, ultimaVista || "");
+        } catch {}
+    });
+
+    const verificar = async () => {
+        if (document.hidden) return;
+        try {
+            const resumo = await api.resumoMensagensNaoLidas();
+            atualizarContadorMenu(resumo.total);
+            ultimaVista = resumo.ultima_id || null;
+            let fechada = null;
+            try {
+                fechada = sessionStorage.getItem(AVISO_FECHADO_KEY);
+            } catch {}
+            if (!resumo.total || naPaginaDeMensagens || fechada === resumo.ultima_id) {
+                aviso.hidden = true;
+                return;
+            }
+            titulo.textContent = resumo.total === 1
+                ? `Nova mensagem de ${resumo.ultima_remetente_nome}`
+                : `${resumo.total} mensagens novas`;
+            previa.textContent = resumo.total === 1
+                ? resumo.ultima_texto
+                : `Última de ${resumo.ultima_remetente_nome}: ${resumo.ultima_texto}`;
+            contador.textContent = resumo.total > 9 ? "9+" : String(resumo.total);
+            abrir.href = caminhoMensagens(resumo.ultima_remetente_id);
+            aviso.hidden = false;
+        } catch {}
+    };
+    verificar();
+    window.setInterval(verificar, 20000);
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) verificar();
+    });
+    window.addEventListener("nutrilife:mensagens-lidas", verificar);
+}
+
+async function loadMessagesPage(user) {
+    if (!["nutricionista", "paciente"].includes(user.perfil)) {
+        window.location.replace("../dashboard.html");
+        return;
+    }
+    const chat = document.getElementById("chat");
+    const listaConversas = document.getElementById("chat-conversations");
+    const mensagens = document.getElementById("chat-messages");
+    const form = document.getElementById("chat-form");
+    const campo = document.getElementById("chat-text");
+    const nomeContato = document.getElementById("chat-contact-name");
+    const perfilContato = document.getElementById("chat-contact-role");
+    let conversas = [];
+    let contatoAtual = new URLSearchParams(window.location.search).get("contato");
+    let assinaturaAtual = "";
+
+    document.getElementById("messages-subtitle").textContent = user.perfil === "nutricionista"
+        ? "Converse com seus pacientes com consulta confirmada ou plano alimentar."
+        : "Converse com as nutricionistas que acompanham você.";
+
+    const renderizarConversas = () => {
+        listaConversas.replaceChildren();
+        if (!conversas.length) {
+            listaConversas.append(createElement("p", "item-meta", user.perfil === "nutricionista"
+                ? "Você ainda não tem pacientes vinculados. O bate-papo libera após uma consulta confirmada ou um plano alimentar."
+                : "Você ainda não tem nutricionista vinculada. O bate-papo libera após uma consulta confirmada ou um plano alimentar."));
+            return;
+        }
+        conversas.forEach((conversa) => {
+            const botao = createElement("button", `chat__conversation${conversa.contato_id === contatoAtual ? " is-active" : ""}`);
+            botao.type = "button";
+            const topo = createElement("span", "chat__conversation-top");
+            topo.append(createElement("strong", "", conversa.contato_nome));
+            if (conversa.ultima_em) topo.append(createElement("small", "", horarioMensagem(conversa.ultima_em)));
+            const rodape = createElement("span", "chat__conversation-bottom");
+            rodape.append(createElement("span", "chat__conversation-preview", conversa.ultima_mensagem
+                ? `${conversa.ultima_minha ? "Você: " : ""}${conversa.ultima_mensagem}`
+                : "Nenhuma mensagem ainda"));
+            if (conversa.nao_lidas) rodape.append(createElement("span", "nav-badge", String(conversa.nao_lidas)));
+            botao.append(topo, rodape);
+            botao.addEventListener("click", () => abrirConversa(conversa.contato_id));
+            listaConversas.append(botao);
+        });
+    };
+
+    const carregarConversas = async () => {
+        conversas = await api.listarConversas();
+        renderizarConversas();
+    };
+
+    const renderizarMensagens = (lista) => {
+        const assinatura = lista.map((mensagem) => mensagem.id).join(",");
+        if (assinatura === assinaturaAtual) return;
+        const noFim = mensagens.scrollHeight - mensagens.scrollTop - mensagens.clientHeight < 80;
+        assinaturaAtual = assinatura;
+        mensagens.replaceChildren();
+        if (!lista.length) {
+            mensagens.append(createElement("p", "item-meta chat__empty", "Nenhuma mensagem ainda. Envie a primeira!"));
+            return;
+        }
+        let diaAnterior = "";
+        lista.forEach((mensagem) => {
+            const dia = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(mensagem.criada_em));
+            if (dia !== diaAnterior) {
+                mensagens.append(createElement("p", "chat__day", dia));
+                diaAnterior = dia;
+            }
+            const balao = createElement("div", `chat__bubble${mensagem.minha ? " chat__bubble--mine" : ""}`);
+            balao.append(
+                createElement("p", "chat__bubble-text", mensagem.texto),
+                createElement("span", "chat__bubble-time", `${horarioMensagem(mensagem.criada_em)}${mensagem.minha ? (mensagem.lida_em ? " · lida" : " · enviada") : ""}`),
+            );
+            mensagens.append(balao);
+        });
+        if (noFim || !mensagens.dataset.carregada) mensagens.scrollTop = mensagens.scrollHeight;
+        mensagens.dataset.carregada = "1";
+    };
+
+    const atualizarConversaAtual = async () => {
+        if (!contatoAtual) return;
+        const lista = await api.listarMensagens(contatoAtual);
+        renderizarMensagens(lista);
+        const conversa = conversas.find((item) => item.contato_id === contatoAtual);
+        if (conversa?.nao_lidas) {
+            conversa.nao_lidas = 0;
+            renderizarConversas();
+            window.dispatchEvent(new Event("nutrilife:mensagens-lidas"));
+        }
+    };
+
+    async function abrirConversa(contatoId) {
+        const conversa = conversas.find((item) => item.contato_id === contatoId);
+        if (!conversa) return;
+        contatoAtual = contatoId;
+        assinaturaAtual = "";
+        delete mensagens.dataset.carregada;
+        history.replaceState(null, "", `?contato=${encodeURIComponent(contatoId)}`);
+        nomeContato.textContent = conversa.contato_nome;
+        perfilContato.textContent = conversa.contato_perfil === "nutricionista" ? "Nutricionista" : "Paciente";
+        form.hidden = false;
+        chat.classList.add("is-thread-open");
+        renderizarConversas();
+        mensagens.replaceChildren(createElement("p", "item-meta chat__empty", "Carregando mensagens..."));
+        try {
+            await atualizarConversaAtual();
+        } catch (error) {
+            showDashboardError(error.message);
+        }
+        campo.focus();
+    }
+
+    document.getElementById("chat-back").addEventListener("click", () => chat.classList.remove("is-thread-open"));
+    campo.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            form.requestSubmit();
+        }
+    });
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const texto = campo.value.trim();
+        if (!texto || !contatoAtual) return;
+        const botao = form.querySelector("button");
+        botao.disabled = true;
+        try {
+            await api.enviarMensagem(contatoAtual, texto);
+            campo.value = "";
+            delete mensagens.dataset.carregada;
+            await atualizarConversaAtual();
+            await carregarConversas();
+        } catch (error) {
+            showDashboardError(error.message);
+        } finally {
+            botao.disabled = false;
+            campo.focus();
+        }
+    });
+
+    await carregarConversas();
+    if (contatoAtual && conversas.some((item) => item.contato_id === contatoAtual)) {
+        await abrirConversa(contatoAtual);
+    } else if (conversas.length && window.matchMedia("(min-width: 761px)").matches) {
+        await abrirConversa(conversas[0].contato_id);
+    }
+    window.setInterval(() => {
+        if (document.hidden) return;
+        atualizarConversaAtual().catch(() => {});
+    }, 5000);
+    window.setInterval(() => {
+        if (document.hidden) return;
+        carregarConversas().catch(() => {});
+    }, 15000);
 }
 
 function renderPlans(plans) {
@@ -1039,7 +2093,7 @@ function renderPlans(plans) {
                 const nutrition = option.alimento_id
                     ? ` · Proteína ${nutrientText(option.proteina_g, "g")}, carboidratos ${nutrientText(option.carboidrato_g, "g")}, gorduras ${nutrientText(option.gordura_g, "g")}`
                     : "";
-                return `${option.nome} — ${option.quantidade} ${option.medida} · ${option.calorias} kcal${nutrition}`;
+                return `${option.nome} — ${textoQuantidadeAlimento(option)} · ${option.calorias} kcal${nutrition}`;
             };
             const alimentos = alimentosDaRefeicao(meal);
             const totalKcal = alimentos.reduce((total, food) => total + (Number(food.calorias) || 0), 0);
@@ -1060,6 +2114,33 @@ function renderPlans(plans) {
             meals.append(section);
         });
         article.append(meals);
+
+        const resumo = createElement("details", "nutrition-diet");
+        const { tabela: tabelaNutricao, nutricao } = montarTabelaNutricaoDieta(plan, "nutrition-diet__table");
+        const sumario = createElement("summary", "nutrition-diet__summary");
+        sumario.append(
+            createElement("strong", "", "Tabela nutricional da dieta"),
+            createElement("span", "item-meta", `${Math.round(nutricao.total.energia_kcal).toLocaleString("pt-BR")} kcal por dia`),
+        );
+        const rolagem = createElement("div", "table-scroll");
+        rolagem.append(tabelaNutricao);
+        const comparacao = comparacaoGastoDieta(plan, nutricao.total.energia_kcal);
+        resumo.append(
+            sumario,
+            ...(comparacao ? [createElement("p", `energy-compare energy-compare--${comparacao.tipo}`, comparacao.texto)] : []),
+            montarDistribuicaoMacros(nutricao, "diet-macros"),
+            rolagem,
+            createElement("p", "item-meta nutrition-diet__note", avisoNutricaoDieta(nutricao)),
+        );
+        article.append(resumo);
+
+        const receitasPlano = receitasDoPlano(plan.id);
+        if (receitasPlano.length) {
+            const secaoReceitas = createElement("section", "plan-recipes");
+            secaoReceitas.append(createElement("h5", "", `Receitas da dieta (${receitasPlano.length})`));
+            receitasPlano.forEach((receita) => secaoReceitas.append(montarReceitaRecolhivel(receita)));
+            article.append(secaoReceitas);
+        }
 
         const download = createElement("button", "btn btn--primary plan-download", "Baixar plano em PDF");
         download.type = "button";
@@ -2225,27 +3306,143 @@ function getAvailabilityDraft() {
     });
 }
 
+let ajustesDisponibilidade = new Map();
+
+function chaveData(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function horariosDoDia(date, weeklySchedule) {
+    const chave = chaveData(date);
+    if (ajustesDisponibilidade.has(chave)) {
+        return { horarios: ajustesDisponibilidade.get(chave), ajustado: true };
+    }
+    const dayOfWeek = calendarWeekdayToAvailabilityIndex(date.getDay());
+    return { horarios: weeklySchedule.filter((window) => window.dia_semana === dayOfWeek), ajustado: false };
+}
+
+async function salvarDisponibilidadeCompleta() {
+    const hoje = chaveData(new Date());
+    return api.salvarDisponibilidade({
+        fuso_horario: document.getElementById("timezone").value,
+        horarios: getAvailabilityDraft(),
+        datas_especificas: [...ajustesDisponibilidade.entries()]
+            .filter(([data]) => data >= hoje)
+            .map(([data, horarios]) => ({ data, horarios })),
+    });
+}
+
 function renderAvailabilityDay(selectedDate, weeklySchedule) {
     const title = document.getElementById("availability-selected-date");
     const details = document.getElementById("availability-day-schedule");
-    const dayOfWeek = calendarWeekdayToAvailabilityIndex(selectedDate.getDay());
-    const daySchedule = weeklySchedule.filter((window) => window.dia_semana === dayOfWeek);
+    const chave = chaveData(selectedDate);
+    const { horarios, ajustado } = horariosDoDia(selectedDate, weeklySchedule);
+    const dataExtenso = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long" }).format(selectedDate);
     title.textContent = new Intl.DateTimeFormat("pt-BR", {
         weekday: "long",
         day: "numeric",
         month: "long",
     }).format(selectedDate);
     details.replaceChildren();
-    if (!daySchedule.length) {
+    details.append(createElement(
+        "span",
+        `availability-day-badge${ajustado ? " availability-day-badge--custom" : ""}`,
+        ajustado ? "Ajustado só para este dia" : "Segue o horário da semana",
+    ));
+    if (!horarios.length) {
         details.append(createElement("p", "item-meta", "Sem horários de atendimento neste dia."));
-        return;
     }
-    daySchedule.forEach((window) => {
+    horarios.forEach((window) => {
         details.append(createElement(
             "p",
             "availability-day-slot",
             `${window.inicio} – ${window.fim} · consultas de ${window.duracao_minutos} min`,
         ));
+    });
+
+    if (chave < chaveData(new Date())) {
+        details.append(createElement("p", "item-meta", "Datas passadas não podem ser ajustadas."));
+        return;
+    }
+
+    const atualizarTela = () => document.dispatchEvent(new Event("availabilitychange"));
+    const salvarDia = async (mensagem, desfazer) => {
+        try {
+            await salvarDisponibilidadeCompleta();
+            showDashboardSuccess(mensagem);
+        } catch (error) {
+            desfazer();
+            showDashboardError(error.message);
+        }
+        atualizarTela();
+    };
+
+    const acoes = createElement("div", "availability-day-actions");
+    const ajustar = createElement("button", "btn btn--ghost", ajustado ? "Editar horários deste dia" : "Ajustar só este dia");
+    ajustar.type = "button";
+    const fechar = createElement("button", "btn btn--ghost", "Sem atendimento neste dia");
+    fechar.type = "button";
+    fechar.hidden = ajustado && !horarios.length;
+    acoes.append(ajustar, fechar);
+    if (ajustado) {
+        const voltar = createElement("button", "btn btn--ghost", "Voltar ao horário da semana");
+        voltar.type = "button";
+        voltar.addEventListener("click", () => {
+            const anterior = ajustesDisponibilidade.get(chave);
+            ajustesDisponibilidade.delete(chave);
+            salvarDia(`${dataExtenso} voltou a seguir o horário da semana.`, () => ajustesDisponibilidade.set(chave, anterior));
+        });
+        acoes.append(voltar);
+    }
+    details.append(acoes);
+
+    fechar.addEventListener("click", () => {
+        const anterior = ajustesDisponibilidade.get(chave);
+        ajustesDisponibilidade.set(chave, []);
+        salvarDia(`${dataExtenso} ficou sem atendimento.`, () => {
+            if (anterior) ajustesDisponibilidade.set(chave, anterior);
+            else ajustesDisponibilidade.delete(chave);
+        });
+    });
+
+    ajustar.addEventListener("click", () => {
+        acoes.hidden = true;
+        const dia = calendarWeekdayToAvailabilityIndex(selectedDate.getDay());
+        const editor = createElement("form", "availability-day-editor");
+        editor.append(createElement("h3", "", `Horários de ${dataExtenso}`));
+        const janelas = createElement("div", "availability-day-editor__windows");
+        (horarios.length ? horarios : [{ inicio: "09:00", fim: "12:00", duracao_minutos: 60 }])
+            .forEach((window) => janelas.append(createAvailabilityWindow(dia, window)));
+        const adicionar = createElement("button", "btn btn--ghost", "Adicionar horário");
+        adicionar.type = "button";
+        adicionar.addEventListener("click", () => janelas.append(createAvailabilityWindow(dia)));
+        const botoes = createElement("div", "availability-day-actions");
+        const salvar = createElement("button", "btn btn--primary", "Salvar este dia");
+        salvar.type = "submit";
+        const cancelar = createElement("button", "btn btn--ghost", "Cancelar");
+        cancelar.type = "button";
+        cancelar.addEventListener("click", atualizarTela);
+        botoes.append(salvar, cancelar);
+        editor.append(janelas, adicionar, botoes);
+        editor.addEventListener("submit", (event) => {
+            event.preventDefault();
+            const novos = [...janelas.querySelectorAll(".weekday-window")].map((row) => ({
+                inicio: row.querySelector('[name="inicio"]').value,
+                fim: row.querySelector('[name="fim"]').value,
+                duracao_minutos: Number(row.querySelector('[name="duracao_minutos"]').value),
+            }));
+            if (novos.some((janela) => janela.inicio >= janela.fim)) {
+                showDashboardError("O horário final deve ser depois do inicial.");
+                return;
+            }
+            const anterior = ajustesDisponibilidade.get(chave);
+            ajustesDisponibilidade.set(chave, novos);
+            salvarDia(`Horários de ${dataExtenso} salvos.`, () => {
+                if (anterior) ajustesDisponibilidade.set(chave, anterior);
+                else ajustesDisponibilidade.delete(chave);
+            });
+        });
+        details.append(editor);
     });
 }
 
@@ -2253,13 +3450,6 @@ function renderProfessionalAvailabilityCalendar(month, selectedDate) {
     const calendar = document.getElementById("professional-availability-calendar");
     const monthLabel = document.getElementById("availability-calendar-month");
     const weeklySchedule = getAvailabilityDraft();
-    const windowsByWeekday = new Map();
-    weeklySchedule.forEach((window) => {
-        if (!windowsByWeekday.has(window.dia_semana)) {
-            windowsByWeekday.set(window.dia_semana, []);
-        }
-        windowsByWeekday.get(window.dia_semana).push(window);
-    });
     monthLabel.textContent = new Intl.DateTimeFormat("pt-BR", {
         month: "long",
         year: "numeric",
@@ -2272,17 +3462,17 @@ function renderProfessionalAvailabilityCalendar(month, selectedDate) {
     const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
     for (let day = 1; day <= daysInMonth; day += 1) {
         const date = new Date(month.getFullYear(), month.getMonth(), day);
-        const dayOfWeek = calendarWeekdayToAvailabilityIndex(date.getDay());
-        const windows = windowsByWeekday.get(dayOfWeek) || [];
+        const { horarios: windows, ajustado } = horariosDoDia(date, weeklySchedule);
         const isSelected = date.toDateString() === selectedDate.toDateString();
-        const button = createElement(
-            "button",
-            `calendar-day${windows.length ? " calendar-day--available" : ""}${isSelected ? " calendar-day--selected" : ""}`,
-        );
+        const classes = ["calendar-day"];
+        if (windows.length) classes.push("calendar-day--available");
+        if (ajustado) classes.push(windows.length ? "calendar-day--custom" : "calendar-day--closed");
+        if (isSelected) classes.push("calendar-day--selected");
+        const button = createElement("button", classes.join(" "));
         button.type = "button";
         button.append(createElement("span", "calendar-day__number", String(day)));
         if (windows.length) {
-            button.append(createElement("span", "calendar-day__status", "Atendimento"));
+            button.append(createElement("span", "calendar-day__status", ajustado ? "Só este dia" : "Atendimento"));
             windows.forEach((window) => {
                 button.append(createElement(
                     "span",
@@ -2290,19 +3480,20 @@ function renderProfessionalAvailabilityCalendar(month, selectedDate) {
                     `${window.inicio}–${window.fim}`,
                 ));
             });
+        } else if (ajustado) {
+            button.append(createElement("span", "calendar-day__status", "Sem atendimento"));
         }
         button.setAttribute(
             "aria-label",
             `${new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(date)}${
                 windows.length
-                    ? `, atendimento ${windows.map((window) => `${window.inicio} a ${window.fim}`).join(", ")}`
-                    : ", sem atendimento configurado"
+                    ? `, atendimento ${windows.map((window) => `${window.inicio} a ${window.fim}`).join(", ")}${ajustado ? ", ajustado só para este dia" : ""}`
+                    : ajustado ? ", sem atendimento neste dia" : ", sem atendimento configurado"
             }`,
         );
         button.addEventListener("click", () => {
             selectedDate.setTime(date.getTime());
             renderProfessionalAvailabilityCalendar(month, selectedDate);
-            renderAvailabilityDay(selectedDate, weeklySchedule);
         });
         calendar.append(button);
     }
@@ -2318,6 +3509,7 @@ async function loadProfessionalCalendarPage() {
     let selectedDate = new Date();
 
     document.getElementById("timezone").value = current.fuso_horario;
+    ajustesDisponibilidade = new Map((current.datas_especificas || []).map((item) => [item.data, item.horarios]));
     WEEKDAY_NAMES.forEach((weekdayName, calendarDay) => {
         const day = calendarWeekdayToAvailabilityIndex(calendarDay);
         const daySchedule = current.horarios.filter((window) => window.dia_semana === day);
@@ -2375,10 +3567,7 @@ async function loadProfessionalCalendarPage() {
         const button = form.querySelector('button[type="submit"]');
         button.disabled = true;
         try {
-            await api.salvarDisponibilidade({
-                fuso_horario: document.getElementById("timezone").value,
-                horarios: getAvailabilityDraft(),
-            });
+            await salvarDisponibilidadeCompleta();
             showDashboardSuccess("Disponibilidade salva.");
         } catch (error) {
             showDashboardError(error.message);
@@ -2465,17 +3654,83 @@ const MENU_POR_PERFIL = {
     "search-nav": ["paciente"],
     "patients-nav": ["nutricionista"],
     "plans-nav": ["paciente", "nutricionista"],
+    "recipes-nav": ["paciente", "nutricionista"],
+    "messages-nav": ["paciente", "nutricionista"],
+    "measures-nav": ["paciente"],
+    "anamnesis-nav": ["paciente"],
     "appointments-nav": ["paciente", "nutricionista"],
     "availability-nav": ["nutricionista"],
     "profile-nav": ["nutricionista"],
     "admin-users-nav": ["administrador"],
 };
 
+const GRUPOS_DO_MENU = {
+    nutricionista: [
+        ["Alimentação", ["plans-nav", "recipes-nav"]],
+        ["Agenda", ["appointments-nav", "availability-nav"]],
+    ],
+    paciente: [
+        ["Meu acompanhamento", ["plans-nav", "recipes-nav", "measures-nav", "anamnesis-nav"]],
+    ],
+};
+
+function fecharGruposDoMenu(exceto = null) {
+    document.querySelectorAll(".nav-group.is-open").forEach((grupo) => {
+        if (grupo === exceto) return;
+        grupo.classList.remove("is-open");
+        grupo.querySelector(".nav-group__toggle").setAttribute("aria-expanded", "false");
+    });
+}
+
+function agruparMenu(perfil) {
+    const menu = document.querySelector(".sidebar-nav");
+    if (!menu || menu.dataset.agrupado === perfil) return;
+    menu.dataset.agrupado = perfil;
+    (GRUPOS_DO_MENU[perfil] || []).forEach(([titulo, ids], indice) => {
+        const links = ids.map((id) => document.getElementById(id)).filter((link) => link && !link.hidden);
+        if (links.length < 2) return;
+        const grupo = createElement("div", "nav-group");
+        const botao = createElement("button", "sidebar-link nav-group__toggle");
+        botao.type = "button";
+        botao.setAttribute("aria-haspopup", "true");
+        botao.setAttribute("aria-expanded", "false");
+        botao.setAttribute("aria-controls", `nav-group-${indice}`);
+        botao.append(createElement("span", "", titulo), createElement("span", "nav-group__chevron"));
+        const lista = createElement("div", "nav-group__menu");
+        lista.id = `nav-group-${indice}`;
+        menu.insertBefore(grupo, links[0]);
+        links.forEach((link) => lista.append(link));
+        if (links.some((link) => link.classList.contains("is-active"))) botao.classList.add("is-active");
+        grupo.append(botao, lista);
+        botao.addEventListener("click", (event) => {
+            event.stopPropagation();
+            const abrir = !grupo.classList.contains("is-open");
+            fecharGruposDoMenu(grupo);
+            grupo.classList.toggle("is-open", abrir);
+            botao.setAttribute("aria-expanded", String(abrir));
+        });
+    });
+}
+
+document.addEventListener("click", (event) => {
+    if (!event.target.closest(".nav-group")) fecharGruposDoMenu();
+});
+document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    const aberto = document.querySelector(".nav-group.is-open .nav-group__toggle");
+    fecharGruposDoMenu();
+    aberto?.focus();
+});
+
 function aplicarMenuPorPerfil(perfil) {
     Object.entries(MENU_POR_PERFIL).forEach(([id, perfis]) => {
         const link = document.getElementById(id);
         if (link) link.hidden = !perfis.includes(perfil);
     });
+    document.querySelectorAll("[data-perfis]").forEach((elemento) => {
+        elemento.hidden = !elemento.dataset.perfis.split(" ").includes(perfil);
+    });
+    agruparMenu(perfil);
 }
 
 async function setCurrentUser() {
@@ -2515,6 +3770,15 @@ async function loadDashboard(user) {
     }
 }
 
+const gastosPorPaciente = new Map();
+
+function gastoDoPaciente(pacienteId) {
+    if (!gastosPorPaciente.has(pacienteId)) {
+        gastosPorPaciente.set(pacienteId, api.medidasDoPaciente(pacienteId).then(gastoDaUltimaAvaliacao).catch(() => null));
+    }
+    return gastosPorPaciente.get(pacienteId);
+}
+
 async function loadPlansPage(user) {
     const formPanel = document.getElementById("create-plan-panel");
     if (user.perfil === "nutricionista" && formPanel) {
@@ -2529,9 +3793,29 @@ async function loadPlansPage(user) {
             option.dataset.patientName = patient.nome;
             select.add(option);
         });
+        const energia = document.getElementById("plan-patient-energy");
+        select.addEventListener("change", async () => {
+            energia.hidden = !select.value;
+            if (!select.value) return;
+            const pacienteId = select.value;
+            energia.replaceChildren(createElement("span", "item-meta", "Calculando gasto energético..."));
+            const gasto = await gastoDoPaciente(pacienteId);
+            if (select.value === pacienteId) montarMetasEnergia(energia, gasto);
+        });
     }
 
-    const plans = await api.listarPlanos();
+    const [plans, receitas] = await Promise.all([
+        api.listarPlanos(),
+        user.perfil === "administrador" ? [] : api.listarReceitas().catch(() => []),
+    ]);
+    receitasCarregadas = receitas;
+    if (user.perfil === "paciente") {
+        const gasto = gastoDaUltimaAvaliacao(await api.minhasMedidas().catch(() => []));
+        plans.forEach((plan) => { plan.energiaPaciente = gasto; });
+    } else if (user.perfil === "nutricionista") {
+        const gastos = await Promise.all(plans.map((plan) => gastoDoPaciente(plan.paciente_id)));
+        plans.forEach((plan, indice) => { plan.energiaPaciente = gastos[indice]; });
+    }
     renderPlans(plans);
 }
 
@@ -2559,11 +3843,1062 @@ async function loadPatientsPage(user) {
         plansLink.href = "./planos.html";
         const consultationsLink = createElement("a", "btn btn--ghost", "Ver consultas");
         consultationsLink.href = `./consultas.html?paciente_id=${encodeURIComponent(patient.id)}`;
+        const measuresLink = createElement("a", "btn btn--ghost", "Ver medidas");
+        measuresLink.href = `./medidas.html?paciente=${encodeURIComponent(patient.id)}`;
+        const anamnesisLink = createElement("a", "btn btn--ghost", "Anamnese");
+        anamnesisLink.href = `./anamnese.html?paciente=${encodeURIComponent(patient.id)}`;
         const actions = createElement("div", "patient-action-links");
-        actions.append(plansLink, consultationsLink);
+        actions.append(plansLink, consultationsLink, measuresLink, anamnesisLink);
         item.append(info, actions);
         list.append(item);
     });
+}
+
+const DOBRAS_CUTANEAS = [
+    ["tricipital", "Tricipital"],
+    ["bicipital", "Bicipital"],
+    ["abdominal", "Abdominal"],
+    ["subescapular", "Subescapular"],
+    ["axilar_media", "Axilar média"],
+    ["coxa", "Coxa"],
+    ["toracica", "Torácica (peitoral)"],
+    ["suprailiaca", "Suprailíaca"],
+    ["panturrilha", "Panturrilha"],
+    ["supraespinhal", "Supraespinhal"],
+];
+
+const CIRCUNFERENCIAS = [
+    ["pescoco", "Pescoço"],
+    ["torax", "Tórax"],
+    ["ombro", "Ombro"],
+    ["cintura", "Cintura"],
+    ["quadril", "Quadril"],
+    ["abdomen", "Abdômen"],
+    ["braco_relaxado", "Braço relaxado"],
+    ["braco_contraido", "Braço contraído"],
+    ["antebraco", "Antebraço"],
+    ["coxa_proximal", "Coxa proximal"],
+    ["coxa_medial", "Coxa medial"],
+    ["coxa_distal", "Coxa distal"],
+    ["panturrilha", "Panturrilha"],
+];
+
+const PROTOCOLOS_GORDURA = {
+    pollock7: {
+        nome: "Pollock 7 dobras",
+        dobras: () => ["toracica", "axilar_media", "tricipital", "subescapular", "abdominal", "suprailiaca", "coxa"],
+    },
+    pollock3: {
+        nome: "Pollock 3 dobras",
+        dobras: (sexo) => (sexo === "masculino" ? ["toracica", "abdominal", "coxa"] : ["tricipital", "suprailiaca", "coxa"]),
+    },
+};
+
+const NIVEIS_ATIVIDADE = {
+    sedentario: { nome: "Sedentário", descricao: "pouco ou nenhum exercício" },
+    leve: { nome: "Levemente ativo", descricao: "exercício 1 a 3 vezes por semana" },
+    moderado: { nome: "Moderadamente ativo", descricao: "exercício 3 a 5 vezes por semana" },
+    intenso: { nome: "Muito ativo", descricao: "exercício 6 a 7 vezes por semana" },
+    muito_intenso: { nome: "Extremamente ativo", descricao: "treino pesado diário ou trabalho físico" },
+};
+
+function detalheGasto(r, avaliacao) {
+    if (r.tmb_kcal === null) return "Disponível a partir dos 18 anos";
+    if (r.get_kcal === null) return "Informe o nível de atividade física";
+    return `TMB × ${formatarNumero(r.fator_atividade, 3)} · ${NIVEIS_ATIVIDADE[avaliacao.nivel_atividade]?.nome.toLowerCase() || ""}`;
+}
+
+function metasCaloricas(get) {
+    return [
+        ["Emagrecer", get - 500, get - 300],
+        ["Manter", get, get],
+        ["Ganhar massa", get + 300, get + 500],
+    ];
+}
+
+function gastoDaUltimaAvaliacao(avaliacoes) {
+    const ultima = [...avaliacoes].reverse().find((avaliacao) => avaliacao.resultados.get_kcal !== null);
+    return ultima ? { get: ultima.resultados.get_kcal, tmb: ultima.resultados.tmb_kcal, data: ultima.data_avaliacao, nivel: ultima.nivel_atividade } : null;
+}
+
+function montarMetasEnergia(container, gasto) {
+    if (!gasto) {
+        container.replaceChildren(createElement("span", "item-meta", "Este paciente ainda não tem avaliação com nível de atividade física. Registre em Medidas para ver o gasto energético."));
+        return;
+    }
+    const kcal = (valor) => Math.round(valor).toLocaleString("pt-BR");
+    const titulo = createElement("p", "energy-target__title");
+    titulo.append(
+        createElement("strong", "", `GET ${kcal(gasto.get)} kcal/dia`),
+        createElement("span", "", ` · TMB ${kcal(gasto.tmb)} kcal · ${NIVEIS_ATIVIDADE[gasto.nivel]?.nome || ""} · avaliação de ${formatarDataCurta(gasto.data)}`),
+    );
+    const metas = createElement("div", "energy-target__goals");
+    metasCaloricas(gasto.get).forEach(([rotulo, minimo, maximo]) => {
+        const meta = createElement("span", "energy-target__goal");
+        meta.append(createElement("small", "", rotulo), createElement("strong", "", minimo === maximo ? `${kcal(minimo)} kcal` : `${kcal(minimo)}–${kcal(maximo)} kcal`));
+        metas.append(meta);
+    });
+    container.replaceChildren(titulo, metas);
+}
+
+function comparacaoGastoDieta(plan, energiaDieta) {
+    const gasto = plan.energiaPaciente;
+    if (!gasto) return null;
+    const diferenca = Math.round(energiaDieta - gasto.get);
+    const kcal = (valor) => Math.abs(Math.round(valor)).toLocaleString("pt-BR");
+    const percentual = Math.round((Math.abs(diferenca) / gasto.get) * 100);
+    const situacao = Math.abs(diferenca) < 100
+        ? "dieta próxima do gasto, ideal para manutenção"
+        : diferenca < 0
+            ? `déficit de ${kcal(diferenca)} kcal (${percentual}% abaixo do gasto)`
+            : `superávit de ${kcal(diferenca)} kcal (${percentual}% acima do gasto)`;
+    return {
+        texto: `Gasto energético total (GET) do paciente: ${kcal(gasto.get)} kcal/dia, pela avaliação de ${formatarDataCurta(gasto.data)}. Esta dieta tem ${kcal(energiaDieta)} kcal: ${situacao}.`,
+        tipo: Math.abs(diferenca) < 100 ? "manter" : diferenca < 0 ? "deficit" : "superavit",
+    };
+}
+
+function detalheGordura(r) {
+    const protocolo = PROTOCOLOS_GORDURA[r.protocolo_gordura]?.nome;
+    if (r.percentual_gordura !== null) return [r.classificacao_gordura, protocolo].filter(Boolean).join(" · ");
+    if (r.dobras_faltando?.length) return `${protocolo}: faltam ${r.dobras_faltando.join(", ")}`;
+    return "Informe as dobras cutâneas";
+}
+
+const PARAMETROS_CALCULADOS = [
+    ["Peso atual (kg)", (m) => m.peso_kg, 1],
+    ["Altura (cm)", (m) => m.altura_cm, 0],
+    ["Índice de Massa Corporal (kg/m²)", (m) => m.resultados.imc, 1],
+    ["Classificação do IMC", (m) => m.resultados.classificacao_imc],
+    ["Relação cintura/quadril (RCQ)", (m) => m.resultados.rcq, 2],
+    ["Risco metabólico por RCQ", (m) => m.resultados.risco_rcq],
+    ["Relação cintura/estatura (RCE)", (m) => m.resultados.rce, 2],
+    ["Risco por RCE", (m) => m.resultados.risco_rce],
+    ["Circ. muscular do braço (CMB) (cm)", (m) => m.resultados.cmb_cm, 1],
+    ["Adequação da CMB (%)", (m) => m.resultados.adequacao_cmb, 1],
+    ["Classificação da CMB", (m) => m.resultados.classificacao_cmb],
+    ["Protocolo do % de gordura", (m) => PROTOCOLOS_GORDURA[m.resultados.protocolo_gordura]?.nome || null],
+    ["Percentual de gordura (%)", (m) => m.resultados.percentual_gordura, 1],
+    ["% de gordura — Pollock 7 dobras", (m) => m.resultados.percentual_gordura_pollock7 ?? null, 1],
+    ["% de gordura — Pollock 3 dobras", (m) => m.resultados.percentual_gordura_pollock3 ?? null, 1],
+    ["Classificação do % de gordura", (m) => m.resultados.classificacao_gordura],
+    ["Massa de gordura (kg)", (m) => m.resultados.massa_gordura_kg, 1],
+    ["Massa livre de gordura (kg)", (m) => m.resultados.massa_livre_gordura_kg, 1],
+    ["Massa residual (kg)", (m) => m.resultados.massa_residual_kg, 1],
+    ["Somatório de dobras do protocolo (mm)", (m) => m.resultados.soma_dobras_metodo_mm, 1],
+    ["Densidade corporal (g/mL)", (m) => m.resultados.densidade_corporal, 3],
+    ["Taxa metabólica basal (kcal)", (m) => m.resultados.tmb_kcal, 0],
+    ["Nível de atividade física", (m) => NIVEIS_ATIVIDADE[m.nivel_atividade]?.nome || null],
+    ["Gasto energético total (kcal)", (m) => m.resultados.get_kcal ?? null, 0],
+];
+
+function formatarNumero(valor, casas = 1) {
+    if (valor === null || valor === undefined || valor === "") return "–";
+    return Number(valor).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: casas });
+}
+
+function formatarDataCurta(iso) {
+    return new Intl.DateTimeFormat("pt-BR").format(new Date(`${iso}T12:00:00`));
+}
+
+function celulaComVariacao(atual, anterior, casas) {
+    const celula = createElement("td", "", formatarNumero(atual, casas));
+    if (typeof atual === "number" && typeof anterior === "number" && atual !== anterior) {
+        const diferenca = atual - anterior;
+        const seta = diferenca > 0 ? "↑" : "↓";
+        celula.append(createElement(
+            "small",
+            "measure-delta",
+            ` ${seta} (${diferenca > 0 ? "+" : ""}${formatarNumero(diferenca, casas)})`,
+        ));
+    }
+    return celula;
+}
+
+function montarTabelaHistorico(tabela, avaliacoes, linhas) {
+    const recentes = avaliacoes.slice(-6);
+    const cabecalho = createElement("thead");
+    const linhaCabecalho = createElement("tr");
+    linhaCabecalho.append(createElement("th", "", "Parâmetro"));
+    recentes.forEach((avaliacao) => linhaCabecalho.append(createElement("th", "", formatarDataCurta(avaliacao.data_avaliacao))));
+    cabecalho.append(linhaCabecalho);
+    const corpo = createElement("tbody");
+    linhas.forEach(([rotulo, valor, casas]) => {
+        const valores = recentes.map(valor);
+        if (valores.every((v) => v === null || v === undefined)) return;
+        const linha = createElement("tr");
+        linha.append(createElement("th", "", rotulo));
+        valores.forEach((atual, indice) => {
+            linha.append(casas === undefined
+                ? createElement("td", "", atual || "–")
+                : celulaComVariacao(atual, indice > 0 ? valores[indice - 1] : null, casas));
+        });
+        corpo.append(linha);
+    });
+    tabela.replaceChildren(cabecalho, corpo);
+}
+
+const METRICAS_GRAFICO = [
+    ["composicao", "Composição corporal", null, "kg", 1],
+    ["peso", "Peso", (m) => m.peso_kg, "kg", 1],
+    ["gordura", "% de gordura", (m) => m.resultados.percentual_gordura, "%", 1],
+    ["imc", "IMC", (m) => m.resultados.imc, "", 1],
+    ["massa_magra", "Massa livre de gordura", (m) => m.resultados.massa_livre_gordura_kg, "kg", 1],
+    ["cintura", "Cintura", (m) => m.circunferencias.cintura ?? null, "cm", 1],
+    ["quadril", "Quadril", (m) => m.circunferencias.quadril ?? null, "cm", 1],
+    ["abdomen", "Abdômen", (m) => m.circunferencias.abdomen ?? null, "cm", 1],
+    ["get", "Gasto energético total", (m) => m.resultados.get_kcal ?? null, "kcal", 0],
+];
+
+function montarGraficoLinha(container, avaliacoes, [, rotulo, valor, unidade, casas]) {
+    const dados = avaliacoes.slice(-8).map((avaliacao) => ({ data: avaliacao.data_avaliacao, valor: valor(avaliacao) })).filter((ponto) => typeof ponto.valor === "number");
+    if (!dados.length) {
+        container.replaceChildren(createElement("p", "item-meta measures-chart__empty", `Ainda não há ${rotulo.toLowerCase()} registrado nas avaliações.`));
+        return;
+    }
+    const largura = 720;
+    const altura = 260;
+    const margem = { topo: 28, direita: 24, base: 34, esquerda: 48 };
+    const valores = dados.map((ponto) => ponto.valor);
+    const folga = Math.max((Math.max(...valores) - Math.min(...valores)) * 0.25, Math.max(...valores) * 0.04, 1);
+    const minimo = Math.max(0, Math.min(...valores) - folga);
+    const maximo = Math.max(...valores) + folga;
+    const escalaY = (v) => margem.topo + (altura - margem.topo - margem.base) * (1 - (v - minimo) / (maximo - minimo));
+    const passo = (largura - margem.esquerda - margem.direita) / dados.length;
+    const sufixo = unidade === "%" ? "%" : unidade ? ` ${unidade}` : "";
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", `0 0 ${largura} ${altura}`);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", `Gráfico de evolução: ${rotulo}`);
+    const adicionar = (tag, atributos, texto) => {
+        const elemento = document.createElementNS(ns, tag);
+        Object.entries(atributos).forEach(([chave, v]) => elemento.setAttribute(chave, v));
+        if (texto !== undefined) elemento.textContent = texto;
+        svg.append(elemento);
+        return elemento;
+    };
+    for (let i = 0; i <= 4; i += 1) {
+        const v = minimo + ((maximo - minimo) / 4) * i;
+        const y = escalaY(v);
+        adicionar("line", { x1: margem.esquerda, x2: largura - margem.direita, y1: y, y2: y, stroke: "#E0E0E0", "stroke-width": 1 });
+        adicionar("text", { x: margem.esquerda - 8, y: y + 4, fill: "#828282", "font-size": 11, "font-family": "Work Sans, Arial, sans-serif", "text-anchor": "end" }, formatarNumero(v, casas === 0 ? 0 : 1));
+    }
+    const pontos = dados.map((ponto, indice) => [margem.esquerda + passo * indice + passo / 2, escalaY(ponto.valor), ponto]);
+    if (pontos.length > 1) {
+        const base = escalaY(minimo);
+        adicionar("polygon", {
+            points: [`${pontos[0][0]},${base}`, ...pontos.map(([x, y]) => `${x},${y}`), `${pontos[pontos.length - 1][0]},${base}`].join(" "),
+            fill: "#0D5017",
+            "fill-opacity": 0.08,
+        });
+        adicionar("polyline", { points: pontos.map(([x, y]) => `${x},${y}`).join(" "), fill: "none", stroke: "#0D5017", "stroke-width": 2.5 });
+    }
+    pontos.forEach(([x, y, ponto]) => {
+        adicionar("circle", { cx: x, cy: y, r: 5, fill: "#FFFFFF", stroke: "#0D5017", "stroke-width": 2.5 });
+        adicionar("text", { x, y: y - 12, fill: "#0D5017", "font-size": 11, "font-weight": 600, "font-family": "Work Sans, Arial, sans-serif", "text-anchor": "middle" }, `${formatarNumero(ponto.valor, casas)}${sufixo}`);
+        adicionar("text", { x, y: altura - 12, fill: "#828282", "font-size": 11, "font-family": "Work Sans, Arial, sans-serif", "text-anchor": "middle" }, formatarDataCurta(ponto.data));
+    });
+    container.replaceChildren(svg);
+}
+
+function textoVariacaoMetrica(avaliacoes, [, rotulo, valor, unidade, casas]) {
+    const valores = avaliacoes.map((avaliacao) => ({ data: avaliacao.data_avaliacao, valor: valor(avaliacao) })).filter((ponto) => typeof ponto.valor === "number");
+    if (valores.length < 2) return valores.length ? "Registre mais avaliações para acompanhar a evolução." : "";
+    const primeiro = valores[0];
+    const ultimo = valores[valores.length - 1];
+    const diferenca = ultimo.valor - primeiro.valor;
+    const sufixo = unidade === "%" ? " p.p." : unidade ? ` ${unidade}` : "";
+    if (Math.abs(diferenca) < 10 ** -casas) return `${rotulo} estável desde ${formatarDataCurta(primeiro.data)}.`;
+    return `${rotulo}: ${diferenca > 0 ? "+" : "−"}${formatarNumero(Math.abs(diferenca), casas)}${sufixo} desde ${formatarDataCurta(primeiro.data)} (${valores.length} avaliações).`;
+}
+
+function montarGraficoEvolucao(container, avaliacoes) {
+    const dados = avaliacoes.slice(-8);
+    const largura = 720;
+    const altura = 260;
+    const margem = { topo: 16, direita: 16, base: 34, esquerda: 40 };
+    const maxPeso = Math.ceil((Math.max(...dados.map((d) => d.peso_kg)) * 1.12) / 20) * 20;
+    const escalaY = (valor) => margem.topo + (altura - margem.topo - margem.base) * (1 - valor / maxPeso);
+    const passo = (largura - margem.esquerda - margem.direita) / dados.length;
+    const larguraBarra = Math.min(56, passo * 0.5);
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", `0 0 ${largura} ${altura}`);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Gráfico de evolução do peso, da massa de gordura e da massa livre de gordura");
+    const adicionar = (tag, atributos, texto) => {
+        const elemento = document.createElementNS(ns, tag);
+        Object.entries(atributos).forEach(([chave, valor]) => elemento.setAttribute(chave, valor));
+        if (texto !== undefined) elemento.textContent = texto;
+        svg.append(elemento);
+        return elemento;
+    };
+    for (let i = 0; i <= 4; i += 1) {
+        const valor = (maxPeso / 4) * i;
+        const y = escalaY(valor);
+        adicionar("line", { x1: margem.esquerda, x2: largura - margem.direita, y1: y, y2: y, stroke: "#E0E0E0", "stroke-width": 1 });
+        adicionar("text", { x: margem.esquerda - 8, y: y + 4, fill: "#828282", "font-size": 11, "font-family": "Work Sans, Arial, sans-serif", "text-anchor": "end" }, formatarNumero(valor, 0));
+    }
+    const pontos = [];
+    dados.forEach((avaliacao, indice) => {
+        const centro = margem.esquerda + passo * indice + passo / 2;
+        const x = centro - larguraBarra / 2;
+        const gordura = avaliacao.resultados.massa_gordura_kg;
+        const magra = avaliacao.resultados.massa_livre_gordura_kg;
+        if (gordura !== null && magra !== null) {
+            adicionar("rect", { x, width: larguraBarra, y: escalaY(gordura), height: escalaY(0) - escalaY(gordura), fill: "#e9d8a6", rx: 4 });
+            adicionar("rect", { x, width: larguraBarra, y: escalaY(gordura + magra), height: escalaY(gordura) - escalaY(gordura + magra), fill: "#336633", rx: 4 });
+        } else {
+            adicionar("rect", { x, width: larguraBarra, y: escalaY(avaliacao.peso_kg), height: escalaY(0) - escalaY(avaliacao.peso_kg), fill: "#d1dcd3", rx: 4 });
+        }
+        adicionar("text", { x: centro, y: altura - 12, fill: "#828282", "font-size": 11, "font-family": "Work Sans, Arial, sans-serif", "text-anchor": "middle" }, formatarDataCurta(avaliacao.data_avaliacao));
+        pontos.push([centro, escalaY(avaliacao.peso_kg), avaliacao.peso_kg]);
+    });
+    if (pontos.length > 1) {
+        adicionar("polyline", { points: pontos.map(([x, y]) => `${x},${y}`).join(" "), fill: "none", stroke: "#0D5017", "stroke-width": 2.5 });
+    }
+    pontos.forEach(([x, y, peso]) => {
+        adicionar("circle", { cx: x, cy: y, r: 5, fill: "#FFFFFF", stroke: "#0D5017", "stroke-width": 2.5 });
+        adicionar("text", { x, y: y - 10, fill: "#0D5017", "font-size": 11, "font-weight": 600, "font-family": "Work Sans, Arial, sans-serif", "text-anchor": "middle" }, `${formatarNumero(peso, 1)} kg`);
+    });
+    container.replaceChildren(svg);
+}
+
+function montarResumoMedidas(container, avaliacao) {
+    const r = avaliacao.resultados;
+    const cartoes = [
+        ["Peso", `${formatarNumero(avaliacao.peso_kg)} kg`, `Altura ${formatarNumero(avaliacao.altura_cm, 0)} cm`],
+        ["IMC", formatarNumero(r.imc), r.classificacao_imc],
+        ["Gordura corporal", r.percentual_gordura !== null ? `${formatarNumero(r.percentual_gordura)}%` : "–", detalheGordura(r)],
+        ["Massa de gordura", r.massa_gordura_kg !== null ? `${formatarNumero(r.massa_gordura_kg)} kg` : "–", "Peso × % de gordura"],
+        ["Massa livre de gordura", r.massa_livre_gordura_kg !== null ? `${formatarNumero(r.massa_livre_gordura_kg)} kg` : "–", "Músculos, ossos, órgãos e água"],
+        ["Relação cintura/quadril", r.rcq !== null ? formatarNumero(r.rcq, 2) : "–", r.risco_rcq ? `Risco ${r.risco_rcq.toLowerCase()}` : "Informe cintura e quadril"],
+        ["CMB", r.cmb_cm !== null ? `${formatarNumero(r.cmb_cm)} cm` : "–", r.classificacao_cmb || "Informe braço e dobra tricipital"],
+        ["Taxa metabólica basal", r.tmb_kcal !== null ? `${formatarNumero(r.tmb_kcal, 0)} kcal` : "–", "Mifflin-St Jeor"],
+        ["Gasto energético total", r.get_kcal != null ? `${formatarNumero(r.get_kcal, 0)} kcal` : "–", detalheGasto(r, avaliacao)],
+    ];
+    container.replaceChildren(...cartoes.map(([rotulo, valor, detalhe]) => {
+        const cartao = createElement("article", "measure-card");
+        cartao.append(
+            createElement("span", "measure-card__label", rotulo),
+            createElement("strong", "measure-card__value", valor),
+            createElement("span", "measure-card__detail", detalhe),
+        );
+        return cartao;
+    }));
+}
+
+function montarMedidasPdf({ avaliacao, historico, nomePaciente, imagemBoneco }) {
+    const pagina = createElement("div", "pdf-plano pdf-medidas");
+    const logo = document.querySelector(".brand-logo")?.src
+        || new URL("../assets/images/NutriLife-logo-semfundo.png", window.location.href).href;
+    const r = avaliacao.resultados;
+
+    const cabecalho = createElement("header", "pdf-header");
+    const imagem = document.createElement("img");
+    imagem.src = logo;
+    imagem.alt = "NutriLife";
+    imagem.className = "pdf-logo";
+    const titulo = createElement("div", "pdf-header__title");
+    titulo.append(createElement("span", "pdf-eyebrow", "Avaliação antropométrica"), createElement("h1", "", nomePaciente));
+    cabecalho.append(
+        imagem,
+        titulo,
+        createElement("span", "pdf-header__date", `Emitido em ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(new Date())}`),
+    );
+
+    const cards = createElement("section", "pdf-cards");
+    [
+        ["Avaliação de", formatarDataCurta(avaliacao.data_avaliacao), `${avaliacao.idade_anos} anos · ${avaliacao.sexo_biologico}`],
+        ["Nutricionista", avaliacao.nutricionista_nome || "Não informado", ""],
+        ["Peso e altura", `${formatarNumero(avaliacao.peso_kg)} kg`, `${formatarNumero(avaliacao.altura_cm, 0)} cm`],
+        ["IMC", formatarNumero(r.imc), r.classificacao_imc],
+    ].forEach(([rotulo, valor, detalhe]) => {
+        const card = createElement("div", "pdf-card");
+        card.append(createElement("span", "pdf-card__label", rotulo), createElement("strong", "", valor));
+        if (detalhe) card.append(createElement("span", "pdf-card__detail", detalhe));
+        cards.append(card);
+    });
+
+    const corpo = createElement("section", "pdf-medidas__corpo");
+    if (imagemBoneco) {
+        const figura = createElement("div", "pdf-medidas__figura");
+        const img = document.createElement("img");
+        img.src = imagemBoneco;
+        img.alt = "Corpo em 3D";
+        figura.append(img);
+        corpo.append(figura);
+    }
+    const principais = createElement("div", "pdf-medidas__resultados");
+    [
+        ["Percentual de gordura", r.percentual_gordura !== null ? `${formatarNumero(r.percentual_gordura)}%` : "–", detalheGordura(r)],
+        ["Massa de gordura", r.massa_gordura_kg !== null ? `${formatarNumero(r.massa_gordura_kg)} kg` : "–", ""],
+        ["Massa livre de gordura", r.massa_livre_gordura_kg !== null ? `${formatarNumero(r.massa_livre_gordura_kg)} kg` : "–", ""],
+        ["Massa residual", `${formatarNumero(r.massa_residual_kg)} kg`, ""],
+        ["Relação cintura/quadril", r.rcq !== null ? formatarNumero(r.rcq, 2) : "–", r.risco_rcq ? `Risco ${r.risco_rcq.toLowerCase()}` : ""],
+        ["Relação cintura/estatura", r.rce !== null ? formatarNumero(r.rce, 2) : "–", r.risco_rce ? `Risco ${r.risco_rce.toLowerCase()}` : ""],
+        ["CMB", r.cmb_cm !== null ? `${formatarNumero(r.cmb_cm)} cm` : "–", r.classificacao_cmb],
+        ["Taxa metabólica basal", r.tmb_kcal !== null ? `${formatarNumero(r.tmb_kcal, 0)} kcal` : "–", ""],
+        ["Gasto energético total", r.get_kcal != null ? `${formatarNumero(r.get_kcal, 0)} kcal` : "–", r.get_kcal != null ? detalheGasto(r, avaliacao) : ""],
+    ].forEach(([rotulo, valor, detalhe]) => {
+        const linha = createElement("div", "pdf-medidas__linha");
+        linha.append(createElement("span", "", rotulo), createElement("strong", "", valor));
+        if (detalhe) linha.append(createElement("small", "", detalhe));
+        principais.append(linha);
+    });
+    corpo.append(principais);
+
+    const grafico = createElement("section", "pdf-medidas__bloco");
+    grafico.append(createElement("h2", "", "Evolução da composição corporal"));
+    const areaGrafico = createElement("div", "pdf-medidas__grafico");
+    montarGraficoEvolucao(areaGrafico, historico);
+    const legenda = createElement("p", "pdf-medidas__legenda", "Verde: massa livre de gordura · Bege: massa de gordura · Linha: peso total");
+    grafico.append(areaGrafico, legenda);
+
+    const tabelaParametros = createElement("table", "pdf-tabela pdf-tabela--historico");
+    montarTabelaHistorico(tabelaParametros, historico.slice(-4), PARAMETROS_CALCULADOS);
+    const blocoParametros = createElement("section", "pdf-medidas__bloco");
+    blocoParametros.append(createElement("h2", "", "Parâmetros calculados"), tabelaParametros);
+
+    const tabelaMedidas = createElement("table", "pdf-tabela pdf-tabela--historico");
+    montarTabelaHistorico(tabelaMedidas, historico.slice(-4), [
+        ...DOBRAS_CUTANEAS.map(([chave, rotulo]) => [`Dobra ${rotulo.toLowerCase()} (mm)`, (m) => m.dobras[chave] ?? null, 1]),
+        ...CIRCUNFERENCIAS.map(([chave, rotulo]) => [`Circunferência ${rotulo.toLowerCase()} (cm)`, (m) => m.circunferencias[chave] ?? null, 1]),
+    ]);
+    const blocoMedidas = createElement("section", "pdf-medidas__bloco");
+    blocoMedidas.append(createElement("h2", "", "Medidas antropométricas"), tabelaMedidas);
+
+    const metodo = createElement(
+        "p",
+        "pdf-medidas__metodo",
+        `${r.metodo_gordura ? `% de gordura: ${r.metodo_gordura}. ` : ""}IMC: OMS/Lipschitz · RCQ: Heyward & Stolarczyk · CMB: Jelliffe e Blackburn · Massa residual: Würch · % de gordura: Lohman.`,
+    );
+    pagina.append(cabecalho, cards, corpo, grafico, blocoParametros, blocoMedidas, metodo);
+    if (avaliacao.observacoes) {
+        const observacoes = createElement("section", "pdf-orientacoes");
+        observacoes.append(createElement("h2", "", "Observações"), createElement("p", "", avaliacao.observacoes));
+        pagina.insertBefore(observacoes, grafico);
+    }
+    return pagina;
+}
+
+async function recortarFigura(imagem) {
+    const fonte = new Image();
+    fonte.src = imagem;
+    await fonte.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = fonte.naturalWidth;
+    canvas.height = fonte.naturalHeight;
+    const contexto = canvas.getContext("2d");
+    contexto.drawImage(fonte, 0, 0);
+    const { data, width, height } = contexto.getImageData(0, 0, canvas.width, canvas.height);
+    const fundo = [data[0], data[1], data[2], data[3]];
+    let topo = height;
+    let base = -1;
+    let esquerda = width;
+    let direita = -1;
+    for (let y = 0; y < height; y += 2) {
+        for (let x = 0; x < width; x += 2) {
+            const i = (y * width + x) * 4;
+            const diferenca = Math.abs(data[i] - fundo[0]) + Math.abs(data[i + 1] - fundo[1])
+                + Math.abs(data[i + 2] - fundo[2]) + Math.abs(data[i + 3] - fundo[3]);
+            if (diferenca > 24) {
+                if (y < topo) topo = y;
+                if (y > base) base = y;
+                if (x < esquerda) esquerda = x;
+                if (x > direita) direita = x;
+            }
+        }
+    }
+    if (base < 0) return imagem;
+    const margem = Math.round((base - topo) * 0.04);
+    topo = Math.max(0, topo - margem);
+    base = Math.min(height - 1, base + margem);
+    esquerda = Math.max(0, esquerda - margem);
+    direita = Math.min(width - 1, direita + margem);
+    const recorte = document.createElement("canvas");
+    recorte.width = direita - esquerda + 1;
+    recorte.height = base - topo + 1;
+    recorte.getContext("2d").drawImage(canvas, esquerda, topo, recorte.width, recorte.height, 0, 0, recorte.width, recorte.height);
+    return recorte.toDataURL("image/png");
+}
+
+async function baixarMedidasPdf(dados) {
+    const html2pdf = await carregarGeradorPdf();
+    if (dados.imagemBoneco) {
+        dados = { ...dados, imagemBoneco: await recortarFigura(dados.imagemBoneco).catch(() => dados.imagemBoneco) };
+    }
+    const pagina = montarMedidasPdf(dados);
+    const textoFinal = `Avaliação registrada por ${dados.avaliacao.nutricionista_nome || "nutricionista"} · NutriLife — cuidado nutricional de forma simples, organizada e próxima.`;
+    const area = createElement("div", "pdf-area");
+    area.append(pagina);
+    document.body.append(area);
+    try {
+        await Promise.all([...pagina.querySelectorAll("img")].map((img) => img.decode().catch(() => {})));
+        const nome = (dados.nomePaciente || "paciente")
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+        await html2pdf()
+            .set({
+                margin: [10, 0, 14, 0],
+                filename: `avaliacao-antropometrica-${nome}-${dados.avaliacao.data_avaliacao}.pdf`,
+                image: { type: "jpeg", quality: 0.96 },
+                html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+                jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+                pagebreak: { mode: ["css", "legacy"], avoid: [".pdf-header", ".pdf-cards", ".pdf-medidas__corpo", ".pdf-medidas__bloco", ".pdf-orientacoes", "tr"] },
+            })
+            .from(pagina)
+            .toPdf()
+            .get("pdf")
+            .then((pdf) => {
+                const total = pdf.internal.getNumberOfPages();
+                pdf.setPage(1);
+                pdf.setFillColor(236, 241, 236);
+                pdf.rect(0, 0, pdf.internal.pageSize.getWidth(), 10.2, "F");
+                for (let numero = 1; numero <= total; numero += 1) {
+                    pdf.setPage(numero);
+                    pdf.setTextColor(51, 102, 51);
+                    if (numero === total) {
+                        pdf.setFontSize(7.5);
+                        pdf.text(textoFinal, pdf.internal.pageSize.getWidth() / 2, pdf.internal.pageSize.getHeight() - 10, { align: "center" });
+                    }
+                    pdf.setFontSize(8);
+                    pdf.text(
+                        `NutriLife · Página ${numero} de ${total}`,
+                        pdf.internal.pageSize.getWidth() / 2,
+                        pdf.internal.pageSize.getHeight() - 6,
+                        { align: "center" },
+                    );
+                }
+            })
+            .save();
+    } finally {
+        area.remove();
+    }
+}
+
+function aguardarBoneco() {
+    if (window.NutriBoneco) return Promise.resolve(window.NutriBoneco);
+    return new Promise((resolve, reject) => {
+        const limite = window.setTimeout(() => reject(new Error("Não foi possível carregar o modelo 3D.")), 15000);
+        window.addEventListener("nutri-boneco-pronto", () => {
+            window.clearTimeout(limite);
+            resolve(window.NutriBoneco);
+        }, { once: true });
+    });
+}
+
+function montarFormularioMedidas(form, aoSalvar, aoExcluir) {
+    form.replaceChildren();
+    const campoNumero = (nome, rotulo, opcoes = {}) => {
+        const input = document.createElement("input");
+        input.type = "number";
+        input.name = nome;
+        input.step = opcoes.passo || "0.1";
+        input.min = opcoes.min ?? "0";
+        if (opcoes.max) input.max = opcoes.max;
+        if (opcoes.obrigatorio) input.required = true;
+        input.inputMode = "decimal";
+        return inputGroup(rotulo, input);
+    };
+
+    const basicos = createElement("fieldset", "measure-form__group");
+    basicos.append(createElement("legend", "", "Dados da avaliação"));
+    const data = document.createElement("input");
+    data.type = "date";
+    data.name = "data_avaliacao";
+    data.required = true;
+    data.max = new Date().toISOString().slice(0, 10);
+    const sexo = document.createElement("select");
+    sexo.name = "sexo_biologico";
+    sexo.required = true;
+    sexo.add(new Option("Selecione", ""));
+    sexo.add(new Option("Feminino", "feminino"));
+    sexo.add(new Option("Masculino", "masculino"));
+    const atividade = document.createElement("select");
+    atividade.name = "nivel_atividade";
+    atividade.add(new Option("Não informado", ""));
+    Object.entries(NIVEIS_ATIVIDADE).forEach(([valor, nivel]) => atividade.add(new Option(`${nivel.nome} (${nivel.descricao})`, valor)));
+    const grade = createElement("div", "measure-form__grid");
+    grade.append(
+        inputGroup("Data da avaliação", data),
+        inputGroup("Sexo biológico", sexo),
+        campoNumero("idade_anos", "Idade (anos)", { passo: "1", min: "2", max: "120", obrigatorio: true }),
+        campoNumero("peso_kg", "Peso (kg)", { min: "1", max: "500", obrigatorio: true }),
+        campoNumero("altura_cm", "Altura (cm)", { min: "50", max: "260", obrigatorio: true }),
+        inputGroup("Nível de atividade física (para o GET)", atividade),
+    );
+    basicos.append(grade);
+
+    const dobras = createElement("fieldset", "measure-form__group");
+    const protocolos = createElement("div", "measure-protocols");
+    protocolos.setAttribute("role", "radiogroup");
+    protocolos.setAttribute("aria-label", "Protocolo do % de gordura");
+    [
+        ["pollock7", "Jackson & Pollock 7 dobras", "Torácica, axilar média, tricipital, subescapular, abdominal, suprailíaca e coxa."],
+        ["pollock3", "Jackson & Pollock 3 dobras", "Mulheres: tricipital, suprailíaca e coxa. Homens: torácica, abdominal e coxa."],
+    ].forEach(([valor, titulo, descricao]) => {
+        const opcao = createElement("label", "measure-protocol");
+        const radio = document.createElement("input");
+        radio.type = "radio";
+        radio.name = "protocolo_gordura";
+        radio.value = valor;
+        radio.checked = valor === "pollock7";
+        const texto = createElement("span", "");
+        texto.append(createElement("strong", "", titulo), createElement("small", "", descricao));
+        opcao.append(radio, texto);
+        protocolos.append(opcao);
+    });
+    const dicaProtocolo = createElement("p", "item-meta measure-protocol__hint");
+    dobras.append(
+        createElement("legend", "", "Dobras cutâneas (mm)"),
+        protocolos,
+        dicaProtocolo,
+    );
+    const gradeDobras = createElement("div", "measure-form__grid");
+    DOBRAS_CUTANEAS.forEach(([chave, rotulo]) => gradeDobras.append(campoNumero(`dobra.${chave}`, rotulo, { max: "100" })));
+    dobras.append(gradeDobras);
+    const destacarDobras = () => {
+        const protocolo = form.querySelector('[name="protocolo_gordura"]:checked')?.value || "pollock7";
+        const usadas = PROTOCOLOS_GORDURA[protocolo].dobras(sexo.value);
+        DOBRAS_CUTANEAS.forEach(([chave]) => {
+            form.elements[`dobra.${chave}`].closest(".input-group").classList.toggle("measure-field--protocol", usadas.includes(chave));
+        });
+        const nomes = usadas.map((chave) => DOBRAS_CUTANEAS.find(([item]) => item === chave)[1].toLowerCase());
+        dicaProtocolo.textContent = protocolo === "pollock3" && !sexo.value
+            ? "Selecione o sexo biológico para ver quais 3 dobras são usadas."
+            : `Dobras usadas no cálculo (destacadas): ${nomes.join(", ")}. As demais ficam registradas, mas não entram no % de gordura.`;
+    };
+    protocolos.addEventListener("change", destacarDobras);
+    sexo.addEventListener("change", destacarDobras);
+
+    const circunferencias = createElement("fieldset", "measure-form__group");
+    circunferencias.append(
+        createElement("legend", "", "Circunferências (cm)"),
+        createElement("p", "item-meta", "Quanto mais medidas você informar, mais fiel fica o seu corpo em 3D."),
+    );
+    const gradeCirc = createElement("div", "measure-form__grid");
+    CIRCUNFERENCIAS.forEach(([chave, rotulo]) => gradeCirc.append(campoNumero(`circ.${chave}`, rotulo, { max: "250" })));
+    circunferencias.append(gradeCirc);
+
+    const observacoes = document.createElement("textarea");
+    observacoes.name = "observacoes";
+    observacoes.maxLength = 1000;
+    observacoes.rows = 2;
+    observacoes.placeholder = "Ex.: medidas coletadas pela nutricionista Amanda";
+
+    const acoes = createElement("div", "measure-form__actions");
+    const salvar = createElement("button", "btn btn--primary", "Salvar avaliação");
+    salvar.type = "submit";
+    const excluir = createElement("button", "btn meal-editor__remove", "Excluir avaliação");
+    excluir.type = "button";
+    excluir.hidden = true;
+    excluir.addEventListener("click", aoExcluir);
+    acoes.append(salvar, excluir);
+
+    form.append(basicos, dobras, circunferencias, inputGroup("Observações", observacoes), acoes);
+
+    form.onsubmit = async (event) => {
+        event.preventDefault();
+        const valores = new FormData(form);
+        const numero = (nome) => {
+            const valor = valores.get(nome);
+            return valor === null || valor === "" ? null : Number(valor);
+        };
+        const dados = {
+            data_avaliacao: valores.get("data_avaliacao"),
+            sexo_biologico: valores.get("sexo_biologico"),
+            idade_anos: numero("idade_anos"),
+            peso_kg: numero("peso_kg"),
+            altura_cm: numero("altura_cm"),
+            dobras: Object.fromEntries(DOBRAS_CUTANEAS.map(([chave]) => [chave, numero(`dobra.${chave}`)])),
+            circunferencias: Object.fromEntries(CIRCUNFERENCIAS.map(([chave]) => [chave, numero(`circ.${chave}`)])),
+            protocolo_gordura: valores.get("protocolo_gordura") || "pollock7",
+            nivel_atividade: valores.get("nivel_atividade") || null,
+            observacoes: valores.get("observacoes") || "",
+        };
+        salvar.disabled = true;
+        try {
+            await aoSalvar(dados);
+        } catch (error) {
+            showDashboardError(error.status === 422
+                ? "Confira os valores informados: algum campo está fora do intervalo permitido."
+                : error.message);
+        } finally {
+            salvar.disabled = false;
+        }
+    };
+
+    return {
+        preencher(avaliacao, editando) {
+            form.reset();
+            excluir.hidden = !editando;
+            const protocolo = avaliacao?.protocolo_gordura || avaliacao?.resultados?.protocolo_gordura || "pollock7";
+            form.querySelector(`[name="protocolo_gordura"][value="${protocolo}"]`).checked = true;
+            if (!avaliacao) {
+                data.value = new Date().toISOString().slice(0, 10);
+                destacarDobras();
+                return;
+            }
+            data.value = editando ? avaliacao.data_avaliacao : new Date().toISOString().slice(0, 10);
+            sexo.value = avaliacao.sexo_biologico;
+            destacarDobras();
+            form.elements.idade_anos.value = avaliacao.idade_anos;
+            form.elements.altura_cm.value = avaliacao.altura_cm;
+            atividade.value = avaliacao.nivel_atividade || "";
+            if (!editando) return;
+            form.elements.peso_kg.value = avaliacao.peso_kg;
+            DOBRAS_CUTANEAS.forEach(([chave]) => {
+                form.elements[`dobra.${chave}`].value = avaliacao.dobras[chave] ?? "";
+            });
+            CIRCUNFERENCIAS.forEach(([chave]) => {
+                form.elements[`circ.${chave}`].value = avaliacao.circunferencias[chave] ?? "";
+            });
+            form.elements.observacoes.value = avaliacao.observacoes || "";
+        },
+    };
+}
+
+const RESTRICOES_ANAMNESE = {
+    vegetariano: "Vegetariano",
+    vegano: "Vegano",
+    sem_lactose: "Sem lactose",
+    sem_gluten: "Sem glúten",
+    low_carb: "Low carb",
+};
+
+const SECOES_ANAMNESE = [
+    ["Objetivo", [
+        ["objetivo", "Qual é o seu principal objetivo?", "area"],
+        ["motivo_consulta", "O que motivou a procura por um nutricionista?", "area"],
+    ]],
+    ["Saúde", [
+        ["doencas", "Doenças ou condições de saúde (diabetes, hipertensão, tireoide...)", "area"],
+        ["medicamentos", "Medicamentos em uso", "area"],
+        ["suplementos", "Suplementos em uso", "area"],
+        ["alergias_intolerancias", "Alergias ou intolerâncias alimentares", "area"],
+        ["cirurgias", "Cirurgias já realizadas", "area"],
+        ["historico_familiar", "Histórico familiar (diabetes, doenças do coração, obesidade...)", "area"],
+        ["exames_recentes", "Exames recentes e resultados importantes", "area"],
+        ["saude_feminina", "Saúde da mulher: ciclo menstrual, gestação, menopausa (se aplicável)", "area"],
+    ]],
+    ["Rotina e estilo de vida", [
+        ["profissao", "Profissão", "texto"],
+        ["horario_acorda", "Horário que acorda", "hora"],
+        ["horario_dorme", "Horário que dorme", "hora"],
+        ["qualidade_sono", "Qualidade do sono", { boa: "Boa", regular: "Regular", ruim: "Ruim" }],
+        ["nivel_estresse", "Nível de estresse", { baixo: "Baixo", moderado: "Moderado", alto: "Alto" }],
+        ["tabagismo", "Fuma?", { nao: "Não", ex_fumante: "Ex-fumante", sim: "Sim" }],
+        ["consumo_alcool", "Bebida alcoólica", { nao: "Não bebe", ocasional: "Ocasionalmente", frequente: "Com frequência" }],
+        ["atividade_fisica", "Atividade física (qual, quantas vezes por semana e por quanto tempo)", "area"],
+    ]],
+    ["Hábitos alimentares", [
+        ["refeicoes_por_dia", "Refeições por dia", "inteiro"],
+        ["consumo_agua_litros", "Água por dia (litros)", "decimal"],
+        ["funcionamento_intestinal", "Funcionamento do intestino", { regular: "Regular", preso: "Preso", solto: "Solto", alternado: "Alterna" }],
+        ["apetite", "Apetite", { pouco: "Pouco", normal: "Normal", aumentado: "Aumentado" }],
+        ["quem_prepara", "Quem prepara as suas refeições?", "texto"],
+        ["come_fora", "Com que frequência come fora ou pede delivery?", "texto"],
+        ["restricoes", "Restrições e estilos alimentares", "opcoes"],
+        ["preferencias", "Alimentos de que mais gosta", "area"],
+        ["aversoes", "Alimentos de que não gosta ou não come", "area"],
+        ["recordatorio_24h", "Recordatório de 24 horas: descreva o que comeu ontem, do café da manhã à ceia, com horários e quantidades aproximadas", "longo"],
+    ]],
+];
+
+function campoAnamnese(nome, rotulo, tipo) {
+    if (tipo === "opcoes") {
+        const grupo = createElement("fieldset", "anamnesis-options anamnesis-field--wide");
+        grupo.append(createElement("legend", "", rotulo));
+        Object.entries(RESTRICOES_ANAMNESE).forEach(([valor, texto]) => {
+            const opcao = createElement("label", "anamnesis-option");
+            const caixa = document.createElement("input");
+            caixa.type = "checkbox";
+            caixa.name = nome;
+            caixa.value = valor;
+            opcao.append(caixa, createElement("span", "", texto));
+            grupo.append(opcao);
+        });
+        return grupo;
+    }
+    let campo;
+    if (typeof tipo === "object") {
+        campo = document.createElement("select");
+        campo.add(new Option("Não informado", ""));
+        Object.entries(tipo).forEach(([valor, texto]) => campo.add(new Option(texto, valor)));
+    } else if (["area", "longo"].includes(tipo)) {
+        campo = document.createElement("textarea");
+        campo.rows = tipo === "longo" ? 6 : 2;
+        campo.maxLength = tipo === "longo" ? 3000 : 1000;
+    } else {
+        campo = document.createElement("input");
+        campo.type = { hora: "time", inteiro: "number", decimal: "number" }[tipo] || "text";
+        if (tipo === "texto") campo.maxLength = nome === "profissao" ? 120 : 1000;
+        if (tipo === "inteiro") Object.assign(campo, { min: "1", max: "12", step: "1", inputMode: "numeric" });
+        if (tipo === "decimal") Object.assign(campo, { min: "0", max: "10", step: "0.1", inputMode: "decimal" });
+    }
+    campo.name = nome;
+    const grupo = inputGroup(rotulo, campo);
+    if (["area", "longo"].includes(tipo)) grupo.classList.add("anamnesis-field--wide");
+    return grupo;
+}
+
+async function loadAnamnesisPage(user) {
+    const pacienteId = new URLSearchParams(window.location.search).get("paciente");
+    const ehNutricionista = user.perfil === "nutricionista";
+    if (ehNutricionista && !pacienteId) {
+        window.location.replace("./pacientes.html");
+        return;
+    }
+    if (!ehNutricionista && user.perfil !== "paciente") {
+        window.location.replace("../dashboard.html");
+        return;
+    }
+
+    if (ehNutricionista) {
+        const pacientes = await api.listarPacientes().catch(() => []);
+        const nomePaciente = pacientes.find((paciente) => paciente.id === pacienteId)?.nome || "Paciente";
+        document.getElementById("anamnesis-title").textContent = `Anamnese de ${nomePaciente}`;
+        document.title = `Anamnese de ${nomePaciente} | NutriLife`;
+        document.getElementById("anamnesis-subtitle").textContent = "Revise e complete as respostas do paciente. As observações clínicas ficam visíveis apenas para nutricionistas.";
+        document.getElementById("patients-nav")?.classList.add("is-active");
+    }
+
+    const form = document.getElementById("anamnesis-form");
+    const secoes = ehNutricionista
+        ? [...SECOES_ANAMNESE, ["Observações clínicas (só nutricionistas veem)", [["observacoes_nutricionista", "Impressões, hipóteses e condutas", "longo"]]]]
+        : SECOES_ANAMNESE;
+    const campos = secoes.flatMap(([, itens]) => itens);
+    form.replaceChildren(...secoes.map(([titulo, itens]) => {
+        const grupo = createElement("fieldset", "measure-form__group");
+        const grade = createElement("div", "measure-form__grid anamnesis-grid");
+        itens.forEach(([nome, rotulo, tipo]) => grade.append(campoAnamnese(nome, rotulo, tipo)));
+        grupo.append(createElement("legend", "", titulo), grade);
+        return grupo;
+    }));
+    const acoes = createElement("div", "measure-form__actions anamnesis-actions");
+    const salvar = createElement("button", "btn btn--primary", "Salvar anamnese");
+    salvar.type = "submit";
+    acoes.append(salvar);
+    form.append(acoes);
+
+    const respondido = (valor) => (Array.isArray(valor) ? valor.length > 0 : valor !== null && valor !== undefined && valor !== "");
+    const mostrarSituacao = (anamnese) => {
+        const respostas = campos.filter(([nome]) => respondido(anamnese[nome])).length;
+        document.getElementById("anamnesis-progress").textContent = `${respostas} de ${campos.length} perguntas respondidas`;
+        document.getElementById("anamnesis-progress-bar").style.width = `${Math.round((respostas / campos.length) * 100)}%`;
+        const quem = anamnese.atualizada_por_perfil === "nutricionista" ? `por ${anamnese.atualizada_por_nome || "nutricionista"} (nutricionista)` : ehNutricionista ? "pelo paciente" : "por você";
+        document.getElementById("anamnesis-updated").textContent = anamnese.atualizada_em
+            ? `Última atualização ${quem} em ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(anamnese.atualizada_em))}.`
+            : ehNutricionista ? "O paciente ainda não preencheu a anamnese." : "Você ainda não preencheu a sua anamnese.";
+    };
+    const preencher = (anamnese) => {
+        campos.forEach(([nome, , tipo]) => {
+            if (tipo === "opcoes") {
+                form.querySelectorAll(`[name="${nome}"]`).forEach((caixa) => { caixa.checked = (anamnese[nome] || []).includes(caixa.value); });
+            } else {
+                form.elements[nome].value = anamnese[nome] ?? "";
+            }
+        });
+        mostrarSituacao(anamnese);
+    };
+    const ler = () => Object.fromEntries(campos.map(([nome, , tipo]) => {
+        if (tipo === "opcoes") return [nome, [...form.querySelectorAll(`[name="${nome}"]:checked`)].map((caixa) => caixa.value)];
+        const valor = form.elements[nome].value.trim();
+        if (["inteiro", "decimal"].includes(tipo)) return [nome, valor === "" ? null : Number(valor)];
+        if (tipo === "hora" || typeof tipo === "object") return [nome, valor || null];
+        return [nome, valor];
+    }));
+
+    preencher(ehNutricionista ? await api.anamneseDoPaciente(pacienteId) : await api.minhaAnamnese());
+
+    form.onsubmit = async (event) => {
+        event.preventDefault();
+        salvar.disabled = true;
+        salvar.textContent = "Salvando...";
+        try {
+            const anamnese = ehNutricionista
+                ? await api.salvarAnamneseDoPaciente(pacienteId, ler())
+                : await api.salvarMinhaAnamnese(ler());
+            preencher(anamnese);
+            showDashboardSuccess("Anamnese salva.");
+        } catch (error) {
+            showDashboardError(error.status === 422 ? "Confira os valores informados: algum campo está fora do intervalo permitido." : error.message);
+        } finally {
+            salvar.disabled = false;
+            salvar.textContent = "Salvar anamnese";
+        }
+    };
+}
+
+async function loadMeasuresPage(user) {
+    const pacienteId = new URLSearchParams(window.location.search).get("paciente");
+    const ehNutricionista = user.perfil === "nutricionista";
+    if (ehNutricionista && !pacienteId) {
+        window.location.replace("./pacientes.html");
+        return;
+    }
+    if (!ehNutricionista && user.perfil !== "paciente") {
+        window.location.replace("../dashboard.html");
+        return;
+    }
+    let nomePaciente = user.nome;
+
+    const conteudo = document.getElementById("measures-content");
+    const vazio = document.getElementById("measures-empty");
+    const painelFormulario = document.getElementById("measure-form-panel");
+    const botaoNova = document.getElementById("new-measure");
+    const botaoEditar = document.getElementById("edit-measure");
+    const seletor = document.getElementById("measure-date");
+    let avaliacoes = [];
+    let selecionada = null;
+    let editandoId = null;
+    let visualizador = null;
+
+    const botaoPdf = document.getElementById("download-measure");
+    if (ehNutricionista) {
+        const pacientes = await api.listarPacientes().catch(() => []);
+        nomePaciente = pacientes.find((paciente) => paciente.id === pacienteId)?.nome || "Paciente";
+        document.getElementById("measures-title").textContent = `Medidas de ${nomePaciente}`;
+        document.title = `Medidas de ${nomePaciente} | NutriLife`;
+        document.getElementById("measures-subtitle").textContent = "Registre as avaliações antropométricas deste paciente. Ele verá o corpo em 3D e poderá baixar a avaliação em PDF.";
+        document.getElementById("measures-empty-text").textContent = "Este paciente ainda não tem avaliações. Clique em Nova avaliação para registrar a primeira.";
+        const pacientesNav = document.getElementById("patients-nav");
+        if (pacientesNav) pacientesNav.classList.add("is-active");
+        botaoNova.hidden = false;
+    }
+
+    const formulario = montarFormularioMedidas(
+        document.getElementById("measure-form"),
+        async (dados) => {
+            if (editandoId) {
+                await api.atualizarMedida(editandoId, dados);
+                showDashboardSuccess("Avaliação atualizada.");
+            } else {
+                await api.criarMedida(pacienteId, dados);
+                showDashboardSuccess("Avaliação registrada. O paciente já pode ver no perfil dele.");
+            }
+            fecharFormulario();
+            await carregar(dados.data_avaliacao);
+        },
+        async () => {
+            if (!editandoId || !window.confirm("Excluir esta avaliação? Essa ação não pode ser desfeita.")) return;
+            try {
+                await api.excluirMedida(editandoId);
+                showDashboardSuccess("Avaliação excluída.");
+                fecharFormulario();
+                await carregar();
+            } catch (error) {
+                showDashboardError(error.message);
+            }
+        },
+    );
+
+    function abrirFormulario(avaliacao, editando) {
+        editandoId = editando ? avaliacao.id : null;
+        document.getElementById("measure-form-title").textContent = editando
+            ? `Editar avaliação de ${formatarDataCurta(avaliacao.data_avaliacao)}`
+            : "Nova avaliação";
+        formulario.preencher(avaliacao, editando);
+        painelFormulario.hidden = false;
+        painelFormulario.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function fecharFormulario() {
+        painelFormulario.hidden = true;
+        editandoId = null;
+    }
+
+    async function mostrar(avaliacao) {
+        selecionada = avaliacao;
+        document.getElementById("figure-title").textContent = `Avaliação de ${formatarDataCurta(avaliacao.data_avaliacao)}`;
+        document.getElementById("figure-author").textContent = avaliacao.nutricionista_nome
+            ? `Registrada por ${avaliacao.nutricionista_nome}`
+            : "";
+        botaoEditar.hidden = !(ehNutricionista && avaliacao.nutricionista_id === user.id);
+        montarResumoMedidas(document.getElementById("measures-summary"), avaliacao);
+        try {
+            const boneco = await aguardarBoneco();
+            if (!visualizador) visualizador = boneco.criarVisualizador(document.getElementById("body-viewer"));
+            visualizador.atualizar(avaliacao);
+        } catch (error) {
+            document.getElementById("body-viewer").textContent = error.message;
+        }
+    }
+
+    async function carregar(dataPreferida) {
+        avaliacoes = ehNutricionista ? await api.medidasDoPaciente(pacienteId) : await api.minhasMedidas();
+        vazio.hidden = avaliacoes.length > 0;
+        conteudo.hidden = avaliacoes.length === 0;
+        botaoPdf.hidden = avaliacoes.length === 0;
+        if (!avaliacoes.length) return;
+
+        seletor.replaceChildren(...[...avaliacoes].reverse().map((avaliacao) =>
+            new Option(formatarDataCurta(avaliacao.data_avaliacao), avaliacao.id)));
+        const escolhida = avaliacoes.findLast((a) => a.data_avaliacao === dataPreferida) || avaliacoes[avaliacoes.length - 1];
+        seletor.value = escolhida.id;
+
+        desenharGrafico();
+        montarTabelaHistorico(document.getElementById("results-table"), avaliacoes, PARAMETROS_CALCULADOS);
+        montarTabelaHistorico(
+            document.getElementById("raw-table"),
+            avaliacoes,
+            [
+                ...DOBRAS_CUTANEAS.map(([chave, rotulo]) => [`Dobra ${rotulo.toLowerCase()} (mm)`, (m) => m.dobras[chave] ?? null, 1]),
+                ...CIRCUNFERENCIAS.map(([chave, rotulo]) => [`Circunferência ${rotulo.toLowerCase()} (cm)`, (m) => m.circunferencias[chave] ?? null, 1]),
+            ],
+        );
+        const metodos = [...new Set(avaliacoes.map((a) => a.resultados.metodo_gordura).filter(Boolean))];
+        document.getElementById("method-note").textContent = [
+            metodos.length ? `% de gordura: ${metodos.join("; ")}.` : "Informe as dobras cutâneas para calcular o % de gordura.",
+            "IMC: OMS (adultos) e Lipschitz (60 anos ou mais). RCQ: Heyward & Stolarczyk. CMB: adequação pelo padrão de Jelliffe e classificação de Blackburn. Massa residual: Würch. % de gordura: Lohman.",
+        ].join(" ");
+        await mostrar(escolhida);
+    }
+
+    const seletorMetrica = document.getElementById("measures-chart-metric");
+    seletorMetrica.replaceChildren(...METRICAS_GRAFICO.map(([chave, rotulo]) => new Option(rotulo, chave)));
+    function desenharGrafico() {
+        const metrica = METRICAS_GRAFICO.find(([chave]) => chave === seletorMetrica.value) || METRICAS_GRAFICO[0];
+        const grafico = document.getElementById("measures-chart");
+        const ehComposicao = metrica[0] === "composicao";
+        document.getElementById("measures-chart-legend").hidden = !ehComposicao;
+        if (ehComposicao) montarGraficoEvolucao(grafico, avaliacoes);
+        else montarGraficoLinha(grafico, avaliacoes, metrica);
+        document.getElementById("measures-chart-note").textContent = textoVariacaoMetrica(avaliacoes, ehComposicao ? METRICAS_GRAFICO[1] : metrica);
+    }
+    seletorMetrica.addEventListener("change", desenharGrafico);
+
+    seletor.addEventListener("change", () => {
+        const avaliacao = avaliacoes.find((a) => a.id === seletor.value);
+        if (avaliacao) mostrar(avaliacao);
+    });
+    botaoNova.addEventListener("click", () => abrirFormulario(avaliacoes[avaliacoes.length - 1], false));
+    botaoPdf.addEventListener("click", async () => {
+        if (!selecionada) return;
+        botaoPdf.disabled = true;
+        botaoPdf.textContent = "Gerando PDF...";
+        try {
+            await baixarMedidasPdf({
+                avaliacao: selecionada,
+                historico: avaliacoes.filter((a) => a.data_avaliacao <= selecionada.data_avaliacao),
+                nomePaciente,
+                imagemBoneco: visualizador?.capturar?.() || null,
+            });
+            showDashboardSuccess("PDF da avaliação baixado.");
+        } catch {
+            showDashboardError("Não foi possível gerar o PDF. Verifique sua conexão e tente novamente.");
+        } finally {
+            botaoPdf.disabled = false;
+            botaoPdf.textContent = "Baixar avaliação em PDF";
+        }
+    });
+    botaoEditar.addEventListener("click", () => selecionada && abrirFormulario(selecionada, true));
+    document.getElementById("measure-cancel").addEventListener("click", fecharFormulario);
+
+    await carregar();
+    if (ehNutricionista && !avaliacoes.length) abrirFormulario(null, false);
 }
 
 async function loadCurrentPage() {
@@ -2582,6 +4917,10 @@ async function loadCurrentPage() {
     if (page === "search") return loadSearchPage(user);
     if (page === "patient-home") return loadPatientHomePage(user);
     if (page === "professional-profile") return loadProfessionalProfile(user);
+    if (page === "measures") return loadMeasuresPage(user);
+    if (page === "anamnesis") return loadAnamnesisPage(user);
+    if (page === "recipes") return loadRecipesPage(user);
+    if (page === "messages") return loadMessagesPage(user);
     if (page === "booking") return loadBookingPage(user);
     if (page === "appointments") return loadAppointmentsPage(user);
     if (page === "professional-calendar") {
@@ -2610,6 +4949,38 @@ async function loadCurrentPage() {
     }
 }
 
+function configurarMenuMobile() {
+    const cabecalho = document.querySelector(".dashboard-sidebar");
+    const menu = cabecalho?.querySelector(".sidebar-nav");
+    if (!menu) return;
+    menu.id = menu.id || "sidebar-menu";
+    const botao = document.createElement("button");
+    botao.type = "button";
+    botao.className = "sidebar-toggle";
+    botao.setAttribute("aria-controls", menu.id);
+    botao.innerHTML = "<span></span>";
+    cabecalho.append(botao);
+    const alternar = (aberto) => {
+        cabecalho.classList.toggle("is-menu-open", aberto);
+        botao.setAttribute("aria-expanded", String(aberto));
+        botao.setAttribute("aria-label", aberto ? "Fechar menu" : "Abrir menu");
+    };
+    alternar(false);
+    botao.addEventListener("click", () => alternar(!cabecalho.classList.contains("is-menu-open")));
+    menu.addEventListener("click", (event) => {
+        if (event.target.closest("a")) alternar(false);
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && cabecalho.classList.contains("is-menu-open")) {
+            alternar(false);
+            botao.focus();
+        }
+    });
+    window.matchMedia("(min-width: 1141px)").addEventListener("change", (event) => {
+        if (event.matches) alternar(false);
+    });
+}
+
 function initProtectedPage() {
     const page = document.body.dataset.page;
     const isSubpage = page !== "dashboard";
@@ -2623,8 +4994,10 @@ function initProtectedPage() {
         });
     }
 
+    configurarMenuMobile();
     const usuarioSalvo = JSON.parse(sessionStorage.getItem(USER_KEY) || "null");
     if (usuarioSalvo) aplicarMenuPorPerfil(usuarioSalvo.perfil);
+    if (usuarioSalvo && api.possuiToken()) iniciarAvisoMensagens(usuarioSalvo.perfil);
 
     initPageHandlers();
 
@@ -2673,12 +5046,13 @@ function configurarCardsRecolhiveis() {
     document.querySelectorAll("[data-collapsible]").forEach((card) => configurarCardRecolhivel(card));
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+    await window.componentesCarregados;
     configurarCardsRecolhiveis();
     if (["auth", "password-reset"].includes(document.body.dataset.page)) adicionarOlhoSenha();
     if (document.body.dataset.page === "auth") initAuthPage();
     if (document.body.dataset.page === "password-reset") initPasswordResetPage();
-    if (["dashboard", "plans", "patients", "search", "patient-home", "professional-profile", "booking", "appointments", "professional-calendar", "professional-profile-edit", "admin-users"].includes(document.body.dataset.page)) {
+    if (["dashboard", "plans", "patients", "search", "patient-home", "professional-profile", "booking", "appointments", "professional-calendar", "professional-profile-edit", "admin-users", "measures", "anamnesis", "recipes", "messages"].includes(document.body.dataset.page)) {
         initProtectedPage();
     }
 });

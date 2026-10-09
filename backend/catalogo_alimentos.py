@@ -5,6 +5,7 @@ from pathlib import Path
 
 DATA_DIRECTORY = Path(__file__).resolve().parent / "data"
 TACO_CATALOG_PATH = DATA_DIRECTORY / "taco_catalogo.json"
+MEDIDAS_CASEIRAS_PATH = DATA_DIRECTORY / "medidas_caseiras.json"
 USDA_CATALOG_PATH = DATA_DIRECTORY / "usda_sr_legacy.json"
 
 
@@ -22,12 +23,40 @@ def carregar_catalogo() -> dict:
 
 
 @lru_cache(maxsize=1)
+def carregar_medidas_caseiras() -> dict:
+    if not MEDIDAS_CASEIRAS_PATH.is_file():
+        return {"source": None, "foods": {}}
+    with MEDIDAS_CASEIRAS_PATH.open(encoding="utf-8") as measures_file:
+        return json.load(measures_file)
+
+
+def _rotulo_medida(medida: dict) -> str:
+    gramas = f"{medida['gram_weight']:g}".replace(".", ",")
+    return f"{medida['label']} · {gramas} g"
+
+
+@lru_cache(maxsize=1)
 def carregar_alimentos() -> list[dict]:
-    return carregar_catalogo()["foods"]
+    medidas = carregar_medidas_caseiras()["foods"]
+    return [
+        {
+            **food,
+            "portions": food["portions"] + [
+                {"label": _rotulo_medida(medida), "gram_weight": medida["gram_weight"]}
+                for medida in medidas.get(food["id"], [])
+            ],
+        }
+        for food in carregar_catalogo()["foods"]
+    ]
 
 
 def carregar_fonte() -> dict:
-    return carregar_catalogo()["source"]
+    fonte = dict(carregar_catalogo()["source"])
+    fonte_medidas = carregar_medidas_caseiras()["source"]
+    if fonte_medidas:
+        fonte["household_measures"] = fonte_medidas
+        fonte["note"] = f"{fonte.get('note', '')} Medidas caseiras: {fonte_medidas['publisher']}.".strip()
+    return fonte
 
 
 @lru_cache(maxsize=1)

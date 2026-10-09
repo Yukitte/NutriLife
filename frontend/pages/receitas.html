@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receitas | NutriLife</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body data-page="recipes">
+    <div class="dashboard-shell">
+        <div data-component="app-sidebar" data-raiz="../" data-ativo="recipes-nav"></div>
+
+        <main class="dashboard-main recipes-page">
+            <header class="dashboard-header">
+                <div>
+                    <span class="eyebrow">Cozinha saudável</span>
+                    <h1>Receitas</h1>
+                    <p id="recipes-subtitle">Receitas práticas para acompanhar o seu plano alimentar.</p>
+                </div>
+                <button id="new-recipe" class="btn btn--primary" type="button" hidden>Nova receita</button>
+            </header>
+            <p id="dashboard-status" class="dashboard-status" role="alert" hidden></p>
+
+            <section id="recipe-form-panel" class="panel recipe-form-panel" hidden>
+                <div class="panel__head">
+                    <h3 id="recipe-form-title">Nova receita</h3>
+                    <button id="recipe-cancel" class="btn btn--ghost" type="button">Cancelar</button>
+                </div>
+                <form id="recipe-form" class="dashboard-form recipe-form">
+                    <div class="input-group recipe-form__wide">
+                        <label for="recipe-title">Nome da receita</label>
+                        <input id="recipe-title" name="titulo" type="text" minlength="3" maxlength="120" placeholder="Ex.: Panqueca de banana com aveia" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="recipe-category">Categoria</label>
+                        <select id="recipe-category" name="categoria">
+                            <option value="">Sem categoria</option>
+                            <option>Café da manhã</option>
+                            <option>Almoço</option>
+                            <option>Jantar</option>
+                            <option>Lanche</option>
+                            <option>Sobremesa</option>
+                            <option>Bebida</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="recipe-time">Tempo de preparo (min)</label>
+                        <input id="recipe-time" name="tempo_preparo_min" type="number" min="1" max="600" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="recipe-portions">Rende quantas porções</label>
+                        <input id="recipe-portions" name="porcoes" type="number" min="1" max="50" value="1" required>
+                    </div>
+                    <fieldset class="recipe-form__wide recipe-ingredients">
+                        <legend>Ingredientes</legend>
+                        <p class="item-meta">Busque o alimento na TACO e informe a quantidade em gramas para calcular a receita. Ingredientes como "sal a gosto" podem ser digitados livremente.</p>
+                        <div id="recipe-ingredients" class="recipe-ingredients__list"></div>
+                        <button id="recipe-add-ingredient" class="btn btn--ghost" type="button">Adicionar ingrediente</button>
+                        <div id="recipe-nutrition-preview" class="recipe-nutrition-preview" aria-live="polite"></div>
+                    </fieldset>
+                    <div class="input-group recipe-form__wide">
+                        <label for="recipe-steps">Modo de preparo</label>
+                        <textarea id="recipe-steps" name="modo_preparo" rows="6" maxlength="4000" placeholder="Descreva o passo a passo." required></textarea>
+                    </div>
+                    <fieldset class="recipe-form__wide recipe-plans">
+                        <legend>Vincular aos planos alimentares</legend>
+                        <p class="item-meta">A receita aparece no plano e no PDF da dieta dos pacientes selecionados.</p>
+                        <div id="recipe-plans" class="recipe-plans__list"></div>
+                    </fieldset>
+                    <button class="btn btn--primary" type="submit">Salvar receita</button>
+                </form>
+            </section>
+
+            <section class="panel recipes-panel">
+                <div class="recipes-toolbar">
+                    <h3>Receitas</h3>
+                    <label for="recipe-search" class="sr-only">Buscar receita</label>
+                    <input id="recipe-search" type="search" placeholder="Buscar receita">
+                </div>
+                <div id="recipes-list" class="recipes-list" aria-live="polite">
+                    <p class="item-meta">Carregando receitas...</p>
+                </div>
+            </section>
+        </main>
+    </div>
+    <div data-component="footer" data-raiz="../"></div>
+
+    <script src="../js/components.js" defer></script>
+    <script src="../config.js" defer></script>
+    <script src="../js/api.js" defer></script>
+    <script src="../js/app.js" defer></script>
+</body>
+</html>

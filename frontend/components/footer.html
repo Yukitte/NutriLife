@@ -1,15 +1,24 @@
-<footer class="site-footer">
-
-    <div class="footer-brand">
-        <img src="./assets/images/NutriLife-logo-semfundo.png" alt="NutriLife" class="footer-logo">
-        <p>
-            Cuidado nutricional de forma simples,
-            organizada e próxima.
-        </p>
+<footer class="app-footer">
+    <div class="app-footer__inner">
+        <div class="app-footer__brand">
+            <img src="{{raiz}}assets/images/NutriLife-logo-semfundo.png" alt="NutriLife" class="app-footer__logo">
+            <p>Cuidado nutricional de forma simples, organizada e próxima, conectando pacientes e nutricionistas.</p>
+        </div>
+        <nav class="app-footer__column" aria-label="Atalhos da plataforma" data-perfis="paciente nutricionista" hidden>
+            <h2>Plataforma</h2>
+            <a href="{{raiz}}pages/planos.html">Planos alimentares</a>
+            <a href="{{raiz}}pages/receitas.html">Receitas</a>
+            <a href="{{raiz}}pages/consultas.html">Agendamentos</a>
+        </nav>
+        <nav class="app-footer__column" aria-label="Sobre o NutriLife">
+            <h2>NutriLife</h2>
+            <a href="{{raiz}}index.html#sobre">Sobre nós</a>
+            <a href="{{raiz}}index.html#como-funciona">Como funciona</a>
+            <a href="{{raiz}}index.html#nutricionistas">Para nutricionistas</a>
+        </nav>
     </div>
-
-    <p class="footer-copy">
-        © 2026 NutriLife. Todos os direitos reservados.
-    </p>
-
+    <div class="app-footer__bottom">
+        <p>© 2026 NutriLife. Todos os direitos reservados.</p>
+        <a href="#" class="app-footer__top">Voltar ao topo ↑</a>
+    </div>
 </footer>

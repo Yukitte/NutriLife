@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minhas medidas | NutriLife</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/styles.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body data-page="measures">
+    <div class="dashboard-shell">
+        <div data-component="app-sidebar" data-raiz="../" data-ativo="measures-nav"></div>
+
+        <main class="dashboard-main measures-page">
+            <header class="dashboard-header">
+                <div>
+                    <span class="eyebrow">Avaliação antropométrica</span>
+                    <h1 id="measures-title">Minhas medidas</h1>
+                    <p id="measures-subtitle">Acompanhe as medidas registradas pelo seu nutricionista e a evolução do seu corpo.</p>
+                </div>
+                <div class="measures-header-actions">
+                    <button id="download-measure" class="btn btn--ghost" type="button" hidden>Baixar avaliação em PDF</button>
+                    <button id="new-measure" class="btn btn--primary" type="button" hidden>Nova avaliação</button>
+                </div>
+            </header>
+            <p id="dashboard-status" class="dashboard-status" role="alert" hidden></p>
+
+            <section id="measures-empty" class="panel measures-empty" hidden>
+                <h3>Nenhuma avaliação registrada</h3>
+                <p id="measures-empty-text">Quando o seu nutricionista registrar a sua avaliação, ela aparece aqui com o seu corpo em 3D, o IMC, o percentual de gordura e a massa magra.</p>
+            </section>
+
+            <section id="measure-form-panel" class="panel measure-form-panel" hidden>
+                <div class="panel__head">
+                    <h3 id="measure-form-title">Nova avaliação</h3>
+                    <button type="button" class="btn btn--ghost measure-form__cancel" id="measure-cancel">Cancelar</button>
+                </div>
+                <form id="measure-form" class="measure-form"></form>
+            </section>
+
+            <div id="measures-content" hidden>
+                <section class="measures-hero">
+                    <article class="panel measures-figure">
+                        <div class="measures-figure__head">
+                            <div>
+                                <span class="eyebrow">Corpo em 3D</span>
+                                <h3 id="figure-title">Avaliação</h3>
+                                <p class="item-meta" id="figure-author"></p>
+                            </div>
+                            <div class="measures-figure__actions">
+                                <label for="measure-date" class="sr-only">Escolher avaliação</label>
+                                <select id="measure-date"></select>
+                                <button type="button" class="btn btn--ghost" id="edit-measure" hidden>Editar</button>
+                            </div>
+                        </div>
+                        <div id="body-viewer" class="body-viewer" aria-label="Modelo 3D do corpo com as circunferências"></div>
+                        <p class="item-meta body-viewer__hint">Arraste para girar. Medidas em cinza não foram informadas e foram estimadas pelo peso e pela altura. Modelo 3D: MakeHuman (licença CC0).</p>
+                    </article>
+                    <div id="measures-summary" class="measures-summary"></div>
+                </section>
+
+                <section class="panel measures-section">
+                    <div class="measures-section__head">
+                        <h3>Evolução</h3>
+                        <div class="measures-figure__actions">
+                            <label for="measures-chart-metric" class="sr-only">Escolher o que mostrar no gráfico</label>
+                            <select id="measures-chart-metric"></select>
+                        </div>
+                    </div>
+                    <div class="measures-section__head">
+                        <p class="item-meta" id="measures-chart-note"></p>
+                        <div class="chart-legend" id="measures-chart-legend">
+                            <span><i class="legend-swatch legend-swatch--lean"></i>Massa livre de gordura</span>
+                            <span><i class="legend-swatch legend-swatch--fat"></i>Massa de gordura</span>
+                            <span><i class="legend-swatch legend-swatch--weight"></i>Peso total</span>
+                        </div>
+                    </div>
+                    <div id="measures-chart" class="measures-chart"></div>
+                </section>
+
+                <section class="panel measures-section">
+                    <h3>Parâmetros calculados</h3>
+                    <div class="table-scroll"><table id="results-table" class="measures-table"></table></div>
+                    <p class="item-meta measures-method" id="method-note"></p>
+                </section>
+
+                <section class="panel measures-section">
+                    <h3>Medidas antropométricas</h3>
+                    <div class="table-scroll"><table id="raw-table" class="measures-table"></table></div>
+                </section>
+            </div>
+        </main>
+    </div>
+    <div data-component="footer" data-raiz="../"></div>
+
+    <script src="../js/components.js" defer></script>
+    <script src="../config.js" defer></script>
+    <script src="../js/api.js" defer></script>
+    <script type="module" src="../js/medidas-boneco.js"></script>
+    <script src="../js/app.js" defer></script>
+</body>
+</html>

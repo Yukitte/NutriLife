@@ -81,6 +81,28 @@
             const query = params.toString() ? `?${params}` : "";
             return request(`/usuarios/nutricionistas/proximos${query}`);
         },
+        minhaAnamnese: () => request("/anamnese/minha"),
+        salvarMinhaAnamnese: (anamnese) => request("/anamnese/minha", {
+            method: "PUT",
+            body: JSON.stringify(anamnese),
+        }),
+        anamneseDoPaciente: (pacienteId) => request(`/anamnese/paciente/${encodeURIComponent(pacienteId)}`),
+        salvarAnamneseDoPaciente: (pacienteId, anamnese) => request(`/anamnese/paciente/${encodeURIComponent(pacienteId)}`, {
+            method: "PUT",
+            body: JSON.stringify(anamnese),
+        }),
+        minhasMedidas: () => request("/medidas/minhas"),
+        medidasDoPaciente: (pacienteId) =>
+            request(`/medidas/paciente/${encodeURIComponent(pacienteId)}`),
+        criarMedida: (pacienteId, medida) => request(`/medidas/paciente/${encodeURIComponent(pacienteId)}`, {
+            method: "POST",
+            body: JSON.stringify(medida),
+        }),
+        atualizarMedida: (id, medida) => request(`/medidas/${encodeURIComponent(id)}`, {
+            method: "PUT",
+            body: JSON.stringify(medida),
+        }),
+        excluirMedida: (id) => request(`/medidas/${encodeURIComponent(id)}`, { method: "DELETE" }),
         listarComentarios: (nutricionistaId) =>
             request(`/comentarios/nutricionista/${encodeURIComponent(nutricionistaId)}`),
         meuComentario: (nutricionistaId) =>
@@ -110,9 +132,31 @@
         excluirPlano: (id) => request(`/planos/${encodeURIComponent(id)}`, {
             method: "DELETE",
         }),
+        listarConversas: () => request("/mensagens/conversas"),
+        resumoMensagensNaoLidas: () => request("/mensagens/nao-lidas"),
+        listarMensagens: (contatoId) => request(`/mensagens/${encodeURIComponent(contatoId)}`),
+        enviarMensagem: (contatoId, texto) => request(`/mensagens/${encodeURIComponent(contatoId)}`, {
+            method: "POST",
+            body: JSON.stringify({ texto }),
+        }),
+        listarReceitas: () => request("/receitas"),
+        criarReceita: (receita) => request("/receitas", {
+            method: "POST",
+            body: JSON.stringify(receita),
+        }),
+        atualizarReceita: (id, receita) => request(`/receitas/${encodeURIComponent(id)}`, {
+            method: "PUT",
+            body: JSON.stringify(receita),
+        }),
+        excluirReceita: (id) => request(`/receitas/${encodeURIComponent(id)}`, { method: "DELETE" }),
         listarCategoriasAlimentos: () => request("/alimentos/categorias"),
         obterFonteAlimentos: () => request("/alimentos/fonte"),
         obterAlimento: (id) => request(`/alimentos/${encodeURIComponent(id)}`),
+        listarMedidasAlimento: (id) => request(`/alimentos/${encodeURIComponent(id)}/medidas`),
+        criarMedidaAlimento: (id, medida) => request(`/alimentos/${encodeURIComponent(id)}/medidas`, {
+            method: "POST",
+            body: JSON.stringify(medida),
+        }),
         buscarAlimentos: (busca, categoria, offset) => {
             const params = new URLSearchParams();
             if (busca) params.set("busca", busca);

@@ -10,6 +10,7 @@ from settings import get_settings
 
 password_hash = PasswordHash.recommended()
 bearer_scheme = HTTPBearer(auto_error=False)
+SENHA_FICTICIA = password_hash.hash("senha-ficticia-usada-para-tempo-constante")
 
 
 def hash_password(password: str) -> str:
@@ -22,11 +23,12 @@ def verify_password(password: str, hashed_password: str) -> bool:
 
 def create_access_token(user_id: str) -> str:
     settings = get_settings()
-    expires_at = datetime.now(timezone.utc) + timedelta(
+    issued_at = datetime.now(timezone.utc)
+    expires_at = issued_at + timedelta(
         minutes=settings.access_token_expire_minutes
     )
     return jwt.encode(
-        {"sub": user_id, "exp": expires_at, "purpose": "access"},
+        {"sub": user_id, "iat": issued_at, "exp": expires_at, "purpose": "access"},
         settings.jwt_secret_key,
         algorithm="HS256",
     )
@@ -54,9 +56,16 @@ def get_current_user(
     except jwt.InvalidTokenError as error:
         raise unauthorized from error
 
-    user = buscar_usuario(user_id)
+    user = buscar_usuario(user_id, incluir_sessao=True)
     if user is None or not user.get("ativo", True):
         raise unauthorized
+    senha_alterada_em = user.pop("senha_alterada_em", None)
+    if senha_alterada_em is not None:
+        if senha_alterada_em.tzinfo is None:
+            senha_alterada_em = senha_alterada_em.replace(tzinfo=timezone.utc)
+        emitido_em = payload.get("iat")
+        if not isinstance(emitido_em, (int, float)) or emitido_em < int(senha_alterada_em.timestamp()):
+            raise unauthorized
     return user
 
 
