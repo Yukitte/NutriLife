@@ -22,10 +22,14 @@
             </header>
             <p id="dashboard-status" class="dashboard-status" role="alert" hidden></p>
             <section class="panel admin-users-panel">
-                <div class="input-group">
-                    <label for="admin-user-search">Buscar por nome ou e-mail</label>
-                    <input id="admin-user-search" type="search" autocomplete="off">
+                <div class="admin-toolbar">
+                    <div class="input-group admin-toolbar__search">
+                        <label for="admin-user-search">Buscar por nome ou e-mail</label>
+                        <input id="admin-user-search" type="search" autocomplete="off" placeholder="Ex.: Ana ou ana@email.com">
+                    </div>
+                    <div id="admin-user-filters" class="admin-filters" role="group" aria-label="Filtrar usuários"></div>
                 </div>
+                <p id="admin-users-count" class="item-meta"></p>
                 <div id="admin-users-list" class="admin-users-list" aria-live="polite">
                     <p class="item-meta">Carregando usuários...</p>
                 </div>

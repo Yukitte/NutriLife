@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel administrativo | NutriLife</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@0,400;0,500;0,600&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body data-page="admin-dashboard">
+    <div class="dashboard-shell">
+        <div data-component="app-sidebar" data-raiz="../" data-ativo="admin-dashboard-nav"></div>
+        <main class="dashboard-main admin-dashboard">
+            <header class="dashboard-header">
+                <div>
+                    <span class="eyebrow">Administração da plataforma</span>
+                    <h1>Painel</h1>
+                    <p>Acompanhe o crescimento e o uso do NutriLife.</p>
+                </div>
+                <a class="btn btn--primary" href="./administracao.html">Gerenciar usuários</a>
+            </header>
+            <p id="dashboard-status" class="dashboard-status" role="alert" hidden></p>
+
+            <section id="admin-kpis" class="dashboard-kpis admin-kpis" aria-label="Indicadores da plataforma"></section>
+
+            <section class="admin-dashboard__grid">
+                <article class="panel admin-dashboard__wide">
+                    <div class="admin-panel__head">
+                        <h3>Novos cadastros</h3>
+                        <div class="chart-legend">
+                            <span><i class="legend-swatch admin-swatch--pacientes"></i>Pacientes</span>
+                            <span><i class="legend-swatch admin-swatch--nutricionistas"></i>Nutricionistas</span>
+                        </div>
+                    </div>
+                    <div id="admin-signups-chart" class="admin-chart"></div>
+                </article>
+                <article class="panel">
+                    <h3>Consultas</h3>
+                    <div id="admin-appointments" class="admin-bars"></div>
+                    <div id="admin-appointments-chart" class="admin-chart admin-chart--small"></div>
+                </article>
+                <article class="panel">
+                    <h3>Uso da plataforma</h3>
+                    <div id="admin-content" class="admin-stats"></div>
+                </article>
+                <article class="panel">
+                    <h3>Nutricionistas por estado</h3>
+                    <div id="admin-states" class="admin-bars"></div>
+                </article>
+                <article class="panel">
+                    <h3>Nutricionistas com mais consultas</h3>
+                    <ol id="admin-top" class="admin-list"></ol>
+                </article>
+                <article class="panel admin-dashboard__wide">
+                    <h3>Cadastros recentes</h3>
+                    <ul id="admin-recent" class="admin-list admin-list--recent"></ul>
+                </article>
+            </section>
+        </main>
+    </div>
+    <div data-component="footer" data-raiz="../"></div>
+
+    <script src="../js/components.js" defer></script>
+    <script src="../config.js" defer></script>
+    <script src="../js/api.js" defer></script>
+    <script src="../js/app.js" defer></script>
+</body>
+</html>

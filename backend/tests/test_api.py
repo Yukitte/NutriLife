@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 import main
+from crud import admin_crud
 from crud import anamnese_crud
 from crud import consulta_crud
 from crud import plano_crud
@@ -2110,3 +2111,55 @@ def test_patient_save_keeps_nutritionist_notes_private(monkeypatch):
     assert patient_view["atualizada_por_perfil"] == "paciente"
     assert nutritionist_view["observacoes_nutricionista"] == "Investigar resistência à insulina."
     assert nutritionist_view["objetivo"] == "Ganhar massa"
+
+
+def test_patient_cannot_read_platform_summary(client, monkeypatch):
+    monkeypatch.setattr("security.buscar_usuario", lambda *_, **__: PATIENT)
+    token = create_access_token(PATIENT["id"])
+
+    response = client.get("/admin/resumo", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 403
+
+
+def test_platform_summary_counts_users_and_appointments(monkeypatch):
+    agora = datetime(2026, 10, 8, 12, tzinfo=timezone.utc)
+    nutricionista_id = ObjectId.from_datetime(datetime(2026, 9, 20, tzinfo=timezone.utc))
+
+    class Colecao:
+        def __init__(self, documentos):
+            self.documentos = documentos
+
+        def find(self, *_):
+            return list(self.documentos)
+
+        def count_documents(self, *_):
+            return len(self.documentos)
+
+    banco = {
+        "usuarios": Colecao([
+            {"_id": nutricionista_id, "nome": "Ana", "perfil": "nutricionista", "estado": "DF", "ativo": True},
+            {"_id": ObjectId.from_datetime(datetime(2026, 10, 1, tzinfo=timezone.utc)), "nome": "Bia", "perfil": "paciente", "ativo": True},
+            {"_id": ObjectId.from_datetime(datetime(2026, 3, 1, tzinfo=timezone.utc)), "nome": "Caio", "perfil": "paciente", "ativo": False},
+        ]),
+        "consultas": Colecao([
+            {"status": "confirmada", "inicio": datetime(2026, 10, 10, 14), "nutricionista_id": nutricionista_id},
+            {"status": "cancelada", "inicio": datetime(2026, 9, 2, 14), "nutricionista_id": nutricionista_id},
+        ]),
+        "comentarios": Colecao([{"nota": 5}, {"nota": 4}]),
+        "planos": Colecao([{}]),
+        "receitas": Colecao([]),
+        "medidas_antropometricas": Colecao([{}, {}]),
+        "anamneses": Colecao([{}]),
+        "mensagens": Colecao([{}]),
+    }
+    monkeypatch.setattr(admin_crud, "get_database", lambda: banco)
+
+    resumo = admin_crud.resumo_plataforma(agora)
+
+    assert resumo["usuarios"] == {"total": 3, "pacientes": 2, "nutricionistas": 1, "administradores": 0, "desativados": 1, "novos_30_dias": 2}
+    assert resumo["cadastros_por_mes"][-1] == {"mes": "2026-10", "pacientes": 1, "nutricionistas": 0}
+    assert resumo["consultas"]["proximos_7_dias"] == 1
+    assert resumo["nutricionistas_destaque"] == [{"nome": "Ana", "consultas": 1}]
+    assert resumo["nutricionistas_por_estado"] == [{"estado": "DF", "total": 1}]
+    assert resumo["conteudo"]["nota_media"] == 4.5

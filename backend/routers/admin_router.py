@@ -1,23 +1,30 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pymongo.errors import DuplicateKeyError
 
+from crud.admin_crud import resumo_plataforma
 from crud.usuario_crud import (
     atualizar_usuario_administrador,
     listar_usuarios_administrador,
     remover_usuario_administrador,
 )
+from schemas.admin_schema import ResumoPlataforma
 from schemas.usuario_schema import AdministradorUsuarioUpdate, UsuarioResponse
 from security import require_administrator
 
-router = APIRouter(prefix="/admin/usuarios", tags=["Administração"])
+router = APIRouter(prefix="/admin", tags=["Administração"])
 
 
-@router.get("", response_model=list[UsuarioResponse])
+@router.get("/resumo", response_model=ResumoPlataforma)
+def consultar_resumo(_: dict = Depends(require_administrator)):
+    return resumo_plataforma()
+
+
+@router.get("/usuarios", response_model=list[UsuarioResponse])
 def listar_usuarios(_: dict = Depends(require_administrator)):
     return listar_usuarios_administrador()
 
 
-@router.put("/{usuario_id}", response_model=UsuarioResponse)
+@router.put("/usuarios/{usuario_id}", response_model=UsuarioResponse)
 def editar_usuario(
     usuario_id: str,
     changes: AdministradorUsuarioUpdate,
@@ -34,7 +41,7 @@ def editar_usuario(
     return updated
 
 
-@router.delete("/{usuario_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/usuarios/{usuario_id}", status_code=status.HTTP_204_NO_CONTENT)
 def excluir_usuario(
     usuario_id: str,
     _: dict = Depends(require_administrator),

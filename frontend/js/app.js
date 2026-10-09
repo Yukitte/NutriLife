@@ -2261,14 +2261,53 @@ function renderPlans(plans) {
     });
 }
 
+const NOMES_PERFIL = {
+    paciente: "Paciente",
+    nutricionista: "Nutricionista",
+    administrador: "Administrador",
+};
+
+const FILTROS_ADMIN = [
+    ["todos", "Todos", () => true],
+    ["paciente", "Pacientes", (user) => user.perfil === "paciente"],
+    ["nutricionista", "Nutricionistas", (user) => user.perfil === "nutricionista"],
+    ["administrador", "Administradores", (user) => user.perfil === "administrador"],
+    ["desativados", "Desativados", (user) => !user.ativo],
+];
+
+let filtroAdmin = "todos";
+
+function iniciaisDoNome(nome) {
+    const partes = String(nome || "").trim().split(/\s+/).filter(Boolean);
+    return ((partes[0]?.[0] || "") + (partes.length > 1 ? partes[partes.length - 1][0] : "")).toUpperCase() || "?";
+}
+
+function renderAdminFilters(users) {
+    const container = document.getElementById("admin-user-filters");
+    container.replaceChildren(...FILTROS_ADMIN.map(([chave, rotulo, filtro]) => {
+        const botao = createElement("button", `admin-filter${filtroAdmin === chave ? " is-active" : ""}`);
+        botao.type = "button";
+        botao.setAttribute("aria-pressed", String(filtroAdmin === chave));
+        botao.append(createElement("span", "", rotulo), createElement("strong", "", String(users.filter(filtro).length)));
+        botao.addEventListener("click", () => {
+            filtroAdmin = chave;
+            renderAdminFilters(users);
+            renderAdminUsers(users);
+        });
+        return botao;
+    }));
+}
+
 function renderAdminUsers(users) {
     const container = document.getElementById("admin-users-list");
     const search = document.getElementById("admin-user-search").value
         .trim()
         .toLocaleLowerCase("pt-BR");
+    const filtro = FILTROS_ADMIN.find(([chave]) => chave === filtroAdmin)[2];
     const filteredUsers = users.filter((user) =>
-        `${user.nome} ${user.email}`.toLocaleLowerCase("pt-BR").includes(search),
+        filtro(user) && `${user.nome} ${user.email}`.toLocaleLowerCase("pt-BR").includes(search),
     );
+    document.getElementById("admin-users-count").textContent = `${filteredUsers.length} de ${users.length} ${users.length === 1 ? "usuário" : "usuários"}`;
     container.replaceChildren();
     if (!filteredUsers.length) {
         container.append(createElement("p", "item-meta", "Nenhum usuário encontrado."));
@@ -2276,26 +2315,31 @@ function renderAdminUsers(users) {
     }
 
     filteredUsers.forEach((user) => {
-        const card = createElement("article", "admin-user-card");
-        const header = createElement("div", "admin-user-card__header");
-        header.append(
-            createElement("h2", "", user.nome),
-            createElement(
-                "span",
-                `item-tag${user.ativo ? "" : " admin-user-status--inactive"}`,
-                user.ativo ? "Ativo" : "Desativado",
-            ),
+        const card = createElement("details", "admin-user-card");
+        const header = createElement("summary", "admin-user-card__header");
+        const identidade = createElement("div", "admin-user-card__identity");
+        const detalhe = user.perfil === "nutricionista"
+            ? `${user.email} · ${formatarCrn(user.crn)}${user.estado ? ` · ${user.estado}` : ""}`
+            : `${user.email}${user.estado ? ` · ${user.estado}` : ""}`;
+        identidade.append(createElement("strong", "", user.nome), createElement("span", "item-meta", detalhe));
+        const tags = createElement("div", "admin-user-card__tags");
+        tags.append(
+            createElement("span", `item-tag admin-role admin-role--${user.perfil}`, NOMES_PERFIL[user.perfil] || user.perfil),
+            createElement("span", `item-tag ${user.ativo ? "item-tag--confirmada" : "admin-user-status--inactive"}`, user.ativo ? "Ativo" : "Desativado"),
         );
-        card.append(header, createElement("p", "item-meta", user.email));
+        header.append(createElement("span", `admin-avatar admin-avatar--${user.perfil}`, iniciaisDoNome(user.nome)), identidade, tags);
+        card.append(header);
         if (user.perfil === "administrador") {
+            header.append(createElement("span", "admin-user-card__toggle", "Detalhes"));
             card.append(createElement(
                 "p",
-                "item-meta",
+                "item-meta admin-user-card__note",
                 "Conta administrativa protegida; não pode ser editada ou excluída por este painel.",
             ));
             container.append(card);
             return;
         }
+        header.append(createElement("span", "admin-user-card__toggle", "Editar"));
 
         const form = createElement("form", "dashboard-form admin-user-form");
         const name = document.createElement("input");
@@ -2463,7 +2507,146 @@ async function loadAdminUsersPage() {
         search.addEventListener("input", () => renderAdminUsers(adminUsersCache));
         search.dataset.bound = "true";
     }
+    renderAdminFilters(adminUsersCache);
     renderAdminUsers(adminUsersCache);
+}
+
+function rotuloMes(mes) {
+    return new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(new Date(`${mes}-15T12:00:00`)).replace(".", "");
+}
+
+function montarBarrasHorizontais(container, itens, vazio) {
+    if (!itens.length || itens.every((item) => !item.valor)) {
+        container.replaceChildren(createElement("p", "item-meta", vazio));
+        return;
+    }
+    const maximo = Math.max(...itens.map((item) => item.valor), 1);
+    container.replaceChildren(...itens.map((item) => {
+        const linha = createElement("div", "admin-bar");
+        const topo = createElement("div", "admin-bar__top");
+        topo.append(createElement("span", "", item.rotulo), createElement("strong", "", item.valor.toLocaleString("pt-BR")));
+        const trilho = createElement("div", "admin-bar__track");
+        const preenchimento = createElement("span", `admin-bar__fill${item.classe ? ` ${item.classe}` : ""}`);
+        preenchimento.style.width = `${(item.valor / maximo) * 100}%`;
+        trilho.append(preenchimento);
+        linha.append(topo, trilho);
+        return linha;
+    }));
+}
+
+function montarGraficoColunas(container, meses, series, altura = 220) {
+    const largura = Math.max(300, Math.round(container.clientWidth) || 640);
+    const margem = { topo: 24, base: 30, esquerda: 12, direita: 12 };
+    const maximo = Math.max(1, ...meses.flatMap((mes) => series.map(([chave]) => mes[chave])));
+    const passo = (largura - margem.esquerda - margem.direita) / meses.length;
+    const larguraBarra = Math.min(28, (passo * 0.7) / series.length);
+    const escala = (valor) => (altura - margem.topo - margem.base) * (valor / maximo);
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", `0 0 ${largura} ${altura}`);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", `Gráfico por mês: ${series.map(([, rotulo]) => rotulo).join(" e ")}`);
+    const adicionar = (tag, atributos, texto) => {
+        const elemento = document.createElementNS(ns, tag);
+        Object.entries(atributos).forEach(([chave, valor]) => elemento.setAttribute(chave, valor));
+        if (texto !== undefined) elemento.textContent = texto;
+        svg.append(elemento);
+    };
+    const base = altura - margem.base;
+    adicionar("line", { x1: margem.esquerda, x2: largura - margem.direita, y1: base, y2: base, class: "admin-chart__axis" });
+    meses.forEach((mes, indice) => {
+        const centro = margem.esquerda + passo * indice + passo / 2;
+        series.forEach(([chave, , classe], serie) => {
+            const valor = mes[chave];
+            const x = centro - (larguraBarra * series.length) / 2 + larguraBarra * serie;
+            const h = Math.max(escala(valor), valor ? 3 : 0);
+            adicionar("rect", { x: x + 2, y: base - h, width: larguraBarra - 4, height: h, rx: 4, class: classe });
+            if (valor) adicionar("text", { x: x + larguraBarra / 2, y: base - h - 6, class: "admin-chart__value", "text-anchor": "middle" }, String(valor));
+        });
+        adicionar("text", { x: centro, y: altura - 10, class: "admin-chart__label", "text-anchor": "middle" }, rotuloMes(mes.mes));
+    });
+    container.replaceChildren(svg);
+}
+
+async function loadAdminDashboardPage() {
+    const resumo = await api.resumoAdministrador();
+    const { usuarios, consultas, conteudo } = resumo;
+    const numero = (valor) => Number(valor || 0).toLocaleString("pt-BR");
+    const cartoes = [
+        ["Usuários", numero(usuarios.total), `+${numero(usuarios.novos_30_dias)} nos últimos 30 dias`],
+        ["Pacientes", numero(usuarios.pacientes), `${numero(usuarios.desativados)} ${usuarios.desativados === 1 ? "conta desativada" : "contas desativadas"} no total`],
+        ["Nutricionistas", numero(usuarios.nutricionistas), `${numero(resumo.nutricionistas_por_estado.length)} ${resumo.nutricionistas_por_estado.length === 1 ? "estado" : "estados"} com atendimento`],
+        ["Consultas confirmadas", numero(consultas.confirmadas), `${numero(consultas.proximos_7_dias)} nos próximos 7 dias`],
+        ["Planos alimentares", numero(conteudo.planos), `${numero(conteudo.receitas)} receitas cadastradas`],
+        ["Avaliação média", conteudo.nota_media === null ? "–" : `★ ${conteudo.nota_media.toLocaleString("pt-BR")}`, `${numero(conteudo.comentarios)} ${conteudo.comentarios === 1 ? "comentário" : "comentários"}`],
+    ];
+    document.getElementById("admin-kpis").replaceChildren(...cartoes.map(([rotulo, valor, detalhe]) => {
+        const cartao = createElement("article", "kpi-card admin-kpi");
+        cartao.append(
+            createElement("span", "kpi-card__label", rotulo),
+            createElement("div", "kpi-card__value", valor),
+            createElement("span", "admin-kpi__detail", detalhe),
+        );
+        return cartao;
+    }));
+
+    montarGraficoColunas(document.getElementById("admin-signups-chart"), resumo.cadastros_por_mes, [
+        ["pacientes", "Pacientes", "admin-chart__bar--pacientes"],
+        ["nutricionistas", "Nutricionistas", "admin-chart__bar--nutricionistas"],
+    ], 240);
+
+    montarBarrasHorizontais(document.getElementById("admin-appointments"), [
+        { rotulo: "Confirmadas", valor: consultas.confirmadas, classe: "admin-bar__fill--confirmada" },
+        { rotulo: "Pendentes", valor: consultas.pendentes, classe: "admin-bar__fill--pendente" },
+        { rotulo: "Canceladas", valor: consultas.canceladas, classe: "admin-bar__fill--cancelada" },
+    ], "Nenhuma consulta agendada ainda.");
+    montarGraficoColunas(document.getElementById("admin-appointments-chart"), resumo.consultas_por_mes, [
+        ["total", "Consultas", "admin-chart__bar--pacientes"],
+    ], 160);
+
+    const estatisticas = [
+        ["Avaliações físicas", conteudo.avaliacoes_fisicas],
+        ["Anamneses preenchidas", conteudo.anamneses],
+        ["Mensagens (30 dias)", conteudo.mensagens_30_dias],
+        ["Receitas", conteudo.receitas],
+    ];
+    document.getElementById("admin-content").replaceChildren(...estatisticas.map(([rotulo, valor]) => {
+        const item = createElement("div", "admin-stat");
+        item.append(createElement("strong", "", numero(valor)), createElement("span", "", rotulo));
+        return item;
+    }));
+
+    montarBarrasHorizontais(
+        document.getElementById("admin-states"),
+        resumo.nutricionistas_por_estado.map((item) => ({ rotulo: item.estado, valor: item.total })),
+        "Nenhum nutricionista com estado informado.",
+    );
+
+    const destaque = document.getElementById("admin-top");
+    destaque.replaceChildren(...(resumo.nutricionistas_destaque.length
+        ? resumo.nutricionistas_destaque.map((item, indice) => {
+            const linha = createElement("li", "admin-list__item");
+            linha.append(
+                createElement("span", "admin-list__rank", String(indice + 1)),
+                createElement("span", "admin-list__name", item.nome),
+                createElement("strong", "", `${numero(item.consultas)} ${item.consultas === 1 ? "consulta" : "consultas"}`),
+            );
+            return linha;
+        })
+        : [createElement("li", "item-meta", "Ainda não há consultas confirmadas.")]));
+
+    const recentes = document.getElementById("admin-recent");
+    recentes.replaceChildren(...resumo.ultimos_cadastros.map((item) => {
+        const linha = createElement("li", "admin-list__item");
+        const info = createElement("span", "admin-list__name");
+        info.append(createElement("strong", "", item.nome), createElement("small", "item-meta", NOMES_PERFIL[item.perfil] || item.perfil));
+        linha.append(
+            createElement("span", `admin-avatar admin-avatar--${item.perfil}`, iniciaisDoNome(item.nome)),
+            info,
+            createElement("span", "item-meta", new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(new Date(item.criado_em))),
+        );
+        return linha;
+    }));
 }
 
 function showDashboardError(message) {
@@ -3649,7 +3832,8 @@ function initPageHandlers() {
 }
 
 const MENU_POR_PERFIL = {
-    "overview-nav": ["nutricionista", "administrador"],
+    "overview-nav": ["nutricionista"],
+    "admin-dashboard-nav": ["administrador"],
     "patient-home-nav": ["paciente"],
     "search-nav": ["paciente"],
     "patients-nav": ["nutricionista"],
@@ -3757,6 +3941,10 @@ async function setCurrentUser() {
 }
 
 async function loadDashboard(user) {
+    if (user.perfil === "administrador") {
+        window.location.replace("./pages/admin-painel.html");
+        return;
+    }
     const plans = await api.listarPlanos();
     const count = document.getElementById("plans-count");
     if (count) count.textContent = String(plans.length);
@@ -4904,12 +5092,12 @@ async function loadMeasuresPage(user) {
 async function loadCurrentPage() {
     const user = await setCurrentUser();
     const page = document.body.dataset.page;
-    if (page === "admin-users") {
+    if (page === "admin-users" || page === "admin-dashboard") {
         if (user.perfil !== "administrador") {
             window.location.replace("../dashboard.html");
             return;
         }
-        return loadAdminUsersPage();
+        return page === "admin-users" ? loadAdminUsersPage() : loadAdminDashboardPage();
     }
     if (page === "dashboard") return loadDashboard(user);
     if (page === "plans") return loadPlansPage(user);
@@ -5052,7 +5240,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (["auth", "password-reset"].includes(document.body.dataset.page)) adicionarOlhoSenha();
     if (document.body.dataset.page === "auth") initAuthPage();
     if (document.body.dataset.page === "password-reset") initPasswordResetPage();
-    if (["dashboard", "plans", "patients", "search", "patient-home", "professional-profile", "booking", "appointments", "professional-calendar", "professional-profile-edit", "admin-users", "measures", "anamnesis", "recipes", "messages"].includes(document.body.dataset.page)) {
+    if (["dashboard", "plans", "patients", "search", "patient-home", "professional-profile", "booking", "appointments", "professional-calendar", "professional-profile-edit", "admin-users", "admin-dashboard", "measures", "anamnesis", "recipes", "messages"].includes(document.body.dataset.page)) {
         initProtectedPage();
     }
 });

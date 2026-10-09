@@ -60,6 +60,7 @@
         excluirConta: () => request("/usuarios/me", {
             method: "DELETE",
         }),
+        resumoAdministrador: () => request("/admin/resumo"),
         listarUsuariosAdministrador: () => request("/admin/usuarios"),
         atualizarUsuarioAdministrador: (id, usuario) => request(
             `/admin/usuarios/${encodeURIComponent(id)}`,
